@@ -1,0 +1,5 @@
+<resources>
+    <!-- 使用最基本的系统主题 -->
+    <style name="Base.Theme.Smartshoe" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Smartshoe" parent="Base.Theme.Smartshoe" />
+</resources>

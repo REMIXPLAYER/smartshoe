@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "src",
+			"path": "../../../../../.."
+		},
+		{
+			"name": "smartshoe",
+			"path": ".."
+		},
+		{
+			"name": "smartshoe-server",
+			"path": "D:/IntelliJ project/smartshoe-server"
+		}
+	],
+	"settings": {}
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 允许明文HTTP流量（用于开发环境访问localhost） -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+
+    <!-- 针对特定域名的配置 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 生产环境服务器 -->
+        <domain includeSubdomains="true">39.97.37.162</domain>
+        <!-- Android模拟器访问主机localhost -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- 本地开发常用IP -->
+        <domain includeSubdomains="true">192.168.1.*</domain>
+        <domain includeSubdomains="true">192.168.0.*</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+</network-security-config>
