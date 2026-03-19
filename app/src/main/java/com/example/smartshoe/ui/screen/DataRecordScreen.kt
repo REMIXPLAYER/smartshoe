@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿package com.example.smartshoe.ui.screen
+﻿﻿﻿package com.example.smartshoe.ui.screen
 
 import android.bluetooth.BluetoothDevice
 import androidx.compose.foundation.background
