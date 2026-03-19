@@ -1,15 +1,9 @@
 package com.example.smartshoe.data.remote
 
-import com.example.smartshoe.data.UserState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.example.smartshoe.data.model.UserState
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * 认证API服务接口
@@ -57,257 +51,129 @@ interface AuthApiService {
      * @return 验证结果
      */
     suspend fun verifyToken(token: String): AuthResult
+}
+
+/**
+ * 认证API服务实现
+ * 使用 @Singleton 和 @Inject 支持 Hilt 依赖注入
+ */
+@Singleton
+class AuthApiServiceImpl @Inject constructor() : AuthApiService, BaseApiService() {
 
     companion object {
-        // 生产环境地址（云服务器）
-         //private const val BASE_URL = "http://39.97.37.162:8080/api"
+        private const val LOGIN_PATH = "/auth/login"
+        private const val REGISTER_PATH = "/auth/register"
+        private const val UPDATE_PROFILE_PATH = "/auth/update-profile"
+        private const val VERIFY_TOKEN_PATH = "/auth/verify-token"
+    }
 
-        // 测试环境地址（本地服务器）
-         private const val BASE_URL = "http://10.0.2.2:8080/api"
+    override suspend fun login(email: String, password: String): AuthResult {
+        val result = executePostForm(
+            path = LOGIN_PATH,
+            formData = mapOf(
+                "email" to email,
+                "password" to password
+            )
+        )
+        return parseAuthResult(result)
+    }
 
-        private const val LOGIN_URL = "$BASE_URL/auth/login"
-        private const val REGISTER_URL = "$BASE_URL/auth/register"
-        private const val UPDATE_PROFILE_URL = "$BASE_URL/auth/update-profile"
-        private const val VERIFY_TOKEN_URL = "$BASE_URL/auth/verify-token"
+    override suspend fun register(
+        username: String,
+        email: String,
+        password: String
+    ): AuthResult {
+        val result = executePostForm(
+            path = REGISTER_PATH,
+            formData = mapOf(
+                "username" to username,
+                "email" to email,
+                "password" to password
+            )
+        )
+        return parseAuthResult(result)
+    }
 
-        // 连接超时时间（毫秒）
-        private const val CONNECT_TIMEOUT = 15000
-        private const val READ_TIMEOUT = 15000
+    override suspend fun updateProfile(
+        userId: String,
+        currentPassword: String,
+        newUsername: String,
+        newEmail: String,
+        newPassword: String
+    ): AuthResult {
+        val formData = mutableMapOf(
+            "userId" to userId,
+            "currentPassword" to currentPassword,
+            "newUsername" to newUsername,
+            "newEmail" to newEmail
+        )
+        if (newPassword.isNotBlank()) {
+            formData["newPassword"] = newPassword
+        }
 
-        fun create(): AuthApiService = AuthApiServiceImpl()
+        val result = executePostForm(
+            path = UPDATE_PROFILE_PATH,
+            formData = formData
+        )
+        return parseAuthResult(result)
+    }
 
-        /**
-         * 设置服务器基础URL（用于切换环境）
-         * @param baseUrl 服务器基础URL，例如：http://192.168.1.100:8080/api
-         */
-        fun setBaseUrl(baseUrl: String) {
-            // 可以通过反射或其他方式动态修改，这里仅作示例
-            // 实际项目中可以使用BuildConfig或配置文件
+    override suspend fun verifyToken(token: String): AuthResult {
+        val result = executePostForm(
+            path = VERIFY_TOKEN_PATH,
+            formData = mapOf("token" to token)
+        )
+        return parseAuthResult(result)
+    }
+
+    /**
+     * 解析认证结果
+     */
+    private fun parseAuthResult(result: ApiResult<String>): AuthResult {
+        return when (result) {
+            is ApiResult.Success -> parseSuccessResponse(result.data)
+            is ApiResult.Error -> AuthResult.Error(
+                result.exception.message ?: "网络错误",
+                result.exception as? Exception
+            )
         }
     }
 
-    private class AuthApiServiceImpl : AuthApiService {
+    /**
+     * 解析成功响应
+     */
+    private fun parseSuccessResponse(response: String): AuthResult {
+        return try {
+            val json = JSONObject(response)
+            val success = json.optBoolean("success", false)
 
-        override suspend fun login(email: String, password: String): AuthResult = withContext(Dispatchers.IO) {
-            try {
-                val url = URL(LOGIN_URL)
-                val connection = url.openConnection() as HttpURLConnection
-
-                connection.apply {
-                    requestMethod = "POST"
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                    connectTimeout = CONNECT_TIMEOUT
-                    readTimeout = READ_TIMEOUT
-                }
-
-                // 发送POST数据
-                val postData = StringBuilder().apply {
-                    append("email=${URLEncoder.encode(email, "UTF-8")}")
-                    append("&password=${URLEncoder.encode(password, "UTF-8")}")
-                }.toString()
-
-                OutputStreamWriter(connection.outputStream).use { writer ->
-                    writer.write(postData)
-                    writer.flush()
-                }
-
-                val responseCode = connection.responseCode
-                val response = readResponse(connection)
-
-                connection.disconnect()
-
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    parseSuccessResponse(response)
+            if (success) {
+                val data = json.optJSONObject("data")
+                if (data != null) {
+                    val userState = UserState(
+                        isLoggedIn = true,
+                        username = data.optString("username", ""),
+                        email = data.optString("email", ""),
+                        userId = data.optString("userId", "")
+                    )
+                    val token = data.optString("token", "")
+                    AuthResult.Success(userState, token)
                 } else {
-                    parseErrorResponse(response)
+                    AuthResult.Error("服务器返回数据格式错误")
                 }
-            } catch (e: Exception) {
-                AuthResult.Error("网络错误: ${e.message}", e)
-            }
-        }
-
-        override suspend fun register(username: String, email: String, password: String): AuthResult = withContext(Dispatchers.IO) {
-            try {
-                val url = URL(REGISTER_URL)
-                val connection = url.openConnection() as HttpURLConnection
-
-                connection.apply {
-                    requestMethod = "POST"
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                    connectTimeout = CONNECT_TIMEOUT
-                    readTimeout = READ_TIMEOUT
-                }
-
-                // 发送POST数据
-                val postData = StringBuilder().apply {
-                    append("username=${URLEncoder.encode(username, "UTF-8")}")
-                    append("&email=${URLEncoder.encode(email, "UTF-8")}")
-                    append("&password=${URLEncoder.encode(password, "UTF-8")}")
-                }.toString()
-
-                OutputStreamWriter(connection.outputStream).use { writer ->
-                    writer.write(postData)
-                    writer.flush()
-                }
-
-                val responseCode = connection.responseCode
-                val response = readResponse(connection)
-
-                connection.disconnect()
-
-                if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
-                    parseSuccessResponse(response)
-                } else {
-                    parseErrorResponse(response)
-                }
-            } catch (e: Exception) {
-                AuthResult.Error("网络错误: ${e.message}", e)
-            }
-        }
-
-        override suspend fun updateProfile(
-            userId: String,
-            currentPassword: String,
-            newUsername: String,
-            newEmail: String,
-            newPassword: String
-        ): AuthResult = withContext(Dispatchers.IO) {
-            try {
-                val url = URL(UPDATE_PROFILE_URL)
-                val connection = url.openConnection() as HttpURLConnection
-
-                connection.apply {
-                    requestMethod = "POST"
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                    connectTimeout = CONNECT_TIMEOUT
-                    readTimeout = READ_TIMEOUT
-                }
-
-                // 发送POST数据
-                val postData = StringBuilder().apply {
-                    append("userId=${URLEncoder.encode(userId, "UTF-8")}")
-                    append("&currentPassword=${URLEncoder.encode(currentPassword, "UTF-8")}")
-                    append("&newUsername=${URLEncoder.encode(newUsername, "UTF-8")}")
-                    append("&newEmail=${URLEncoder.encode(newEmail, "UTF-8")}")
-                    if (newPassword.isNotBlank()) {
-                        append("&newPassword=${URLEncoder.encode(newPassword, "UTF-8")}")
-                    }
-                }.toString()
-
-                OutputStreamWriter(connection.outputStream).use { writer ->
-                    writer.write(postData)
-                    writer.flush()
-                }
-
-                val responseCode = connection.responseCode
-                val response = readResponse(connection)
-
-                connection.disconnect()
-
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    parseSuccessResponse(response)
-                } else {
-                    parseErrorResponse(response)
-                }
-            } catch (e: Exception) {
-                AuthResult.Error("网络错误: ${e.message}", e)
-            }
-        }
-
-        override suspend fun verifyToken(token: String): AuthResult = withContext(Dispatchers.IO) {
-            try {
-                val url = URL(VERIFY_TOKEN_URL)
-                val connection = url.openConnection() as HttpURLConnection
-
-                connection.apply {
-                    requestMethod = "POST"
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                    connectTimeout = CONNECT_TIMEOUT
-                    readTimeout = READ_TIMEOUT
-                }
-
-                // 发送POST数据
-                val postData = "token=${URLEncoder.encode(token, "UTF-8")}"
-
-                OutputStreamWriter(connection.outputStream).use { writer ->
-                    writer.write(postData)
-                    writer.flush()
-                }
-
-                val responseCode = connection.responseCode
-                val response = readResponse(connection)
-
-                connection.disconnect()
-
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    parseSuccessResponse(response)
-                } else {
-                    parseErrorResponse(response)
-                }
-            } catch (e: Exception) {
-                AuthResult.Error("网络错误: ${e.message}", e)
-            }
-        }
-
-        private fun readResponse(connection: HttpURLConnection): String {
-            return try {
-                BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
-                    reader.readText()
-                }
-            } catch (e: Exception) {
-                // 如果inputStream读取失败，尝试读取errorStream
-                BufferedReader(InputStreamReader(connection.errorStream)).use { reader ->
-                    reader.readText()
-                }
-            }
-        }
-
-        private fun parseSuccessResponse(response: String): AuthResult {
-            return try {
-                val json = JSONObject(response)
-                val success = json.optBoolean("success", false)
-
-                if (success) {
-                    val data = json.optJSONObject("data")
-                    if (data != null) {
-                        val userState = UserState(
-                            isLoggedIn = true,
-                            username = data.optString("username", ""),
-                            email = data.optString("email", ""),
-                            userId = data.optString("userId", "")
-                        )
-                        val token = data.optString("token", "")
-                        AuthResult.Success(userState, token)
-                    } else {
-                        AuthResult.Error("服务器返回数据格式错误")
-                    }
-                } else {
-                    val message = json.optString("message", "未知错误")
-                    AuthResult.Error(message)
-                }
-            } catch (e: Exception) {
-                AuthResult.Error("解析响应失败: ${e.message}", e)
-            }
-        }
-
-        private fun parseErrorResponse(response: String): AuthResult {
-            return try {
-                val json = JSONObject(response)
-                val message = json.optString("message", "请求失败")
+            } else {
+                val message = json.optString("message", "未知错误")
                 AuthResult.Error(message)
-            } catch (e: Exception) {
-                AuthResult.Error("请求失败: $response")
             }
+        } catch (e: Exception) {
+            AuthResult.Error("解析响应失败: ${e.message}", e)
         }
     }
 }
 
 /**
  * 认证结果密封类
+ * 保持原有接口不变，确保兼容性
  */
 sealed class AuthResult {
     data class Success(
