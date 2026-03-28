@@ -6,6 +6,7 @@ import com.example.smartshoe.data.manager.SensorDataManager
 import com.example.smartshoe.data.model.UserState
 import com.example.smartshoe.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,6 +103,9 @@ class SettingViewModel @Inject constructor(
     // ==================== 数据备份状态 ====================
     private val _uploadStatus = MutableStateFlow(UploadStatus.IDLE)
     val uploadStatus: StateFlow<UploadStatus> = _uploadStatus.asStateFlow()
+
+    // 用于管理自动重置上传状态的协程
+    private var resetUploadStatusJob: Job? = null
 
     // ==================== 错误信息 ====================
     private val _errorMessage = MutableStateFlow<String?>(null)
@@ -323,34 +327,18 @@ class SettingViewModel @Inject constructor(
     // ==================== 数据备份相关方法 ====================
 
     /**
-     * 执行数据备份（统一管理备份流程）
-     * @param isLoggedIn 是否已登录
-     * @param hasData 是否有数据
-     * @param onUploadData 实际上传数据的回调（由MainActivity提供）
+     * 设置上传状态
+     * @param status 上传状态
      */
-    fun backupData(
-        isLoggedIn: Boolean,
-        hasData: Boolean,
-        onUploadData: (onComplete: (Boolean) -> Unit) -> Unit
-    ) {
-        // 1. 检查是否可以备份
-        if (!canBackup(isLoggedIn, hasData)) {
-            return
-        }
+    fun setUploadStatus(status: UploadStatus) {
+        _uploadStatus.value = status
 
-        // 2. 设置上传状态
-        _uploadStatus.value = UploadStatus.UPLOADING
+        // 取消之前的重置协程（如果有）
+        resetUploadStatusJob?.cancel()
 
-        // 3. 执行上传
-        onUploadData { success ->
-            if (success) {
-                _uploadStatus.value = UploadStatus.SUCCESS
-            } else {
-                _uploadStatus.value = UploadStatus.FAILED
-            }
-            
-            // 3秒后重置状态
-            viewModelScope.launch {
+        // 如果上传成功或失败，3秒后自动重置为空闲状态
+        if (status == UploadStatus.SUCCESS || status == UploadStatus.FAILED) {
+            resetUploadStatusJob = viewModelScope.launch {
                 delay(3000)
                 _uploadStatus.value = UploadStatus.IDLE
             }
@@ -400,6 +388,25 @@ class SettingViewModel @Inject constructor(
 
     fun setEditProfileLoading(loading: Boolean) {
         _isEditProfileLoading.value = loading
+    }
+
+    // ==================== 认证状态处理 ====================
+
+    /**
+     * 处理认证完成（成功或失败后的清理）
+     * 关闭对话框、收起编辑表单、重置加载状态
+     */
+    fun handleAuthCompleted(success: Boolean) {
+        if (success) {
+            hideLoginDialog()
+            hideRegisterDialog()
+            if (_isEditProfileExpanded.value) {
+                toggleEditProfileExpanded()
+            }
+        }
+        _isLoginLoading.value = false
+        _isRegisterLoading.value = false
+        _isEditProfileLoading.value = false
     }
 }
 

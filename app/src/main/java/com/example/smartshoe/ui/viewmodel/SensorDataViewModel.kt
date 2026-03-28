@@ -248,6 +248,37 @@ class SensorDataViewModel @Inject constructor(
     }
 
     /**
+     * 执行数据备份（简化版）
+     * 自动获取本地数据并上传，上传成功后清空本地历史数据
+     * 所有业务逻辑封装在ViewModel中，UI层只需调用此方法
+     *
+     * @param onComplete 完成回调，返回是否成功
+     */
+    fun backupData(onComplete: (Boolean) -> Unit) {
+        val dataPoints = getBackupDataForUpload()
+
+        if (dataPoints.isEmpty()) {
+            onComplete(false)
+            return
+        }
+
+        uploadDataToServer(dataPoints) { success, _ ->
+            if (success) {
+                // 清空本地历史数据
+                clearHistoricalData()
+            }
+            onComplete(success)
+        }
+    }
+
+    /**
+     * 清空历史数据（内部方法）
+     */
+    private fun clearHistoricalData() {
+        _historicalData.value = emptyList()
+    }
+
+    /**
      * 获取用户的数据记录列表
      * 封装 SensorDataManager 的查询功能
      *

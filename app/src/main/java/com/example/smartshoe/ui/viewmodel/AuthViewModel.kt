@@ -107,15 +107,20 @@ class AuthViewModel @Inject constructor(
 
     /**
      * 更新用户资料
+     * 自动使用当前登录用户的ID
      */
     fun updateProfile(
-        userId: String,
         currentPassword: String,
         newUsername: String,
         newEmail: String,
         newPassword: String
     ) {
         viewModelScope.launch {
+            val userId = _userState.value.userId
+            if (userId.isEmpty()) {
+                _uiState.value = AuthUiState.Error("用户未登录")
+                return@launch
+            }
             _uiState.value = AuthUiState.Loading
             authRepository.updateProfile(userId, currentPassword, newUsername, newEmail, newPassword)
                 .onSuccess { user ->

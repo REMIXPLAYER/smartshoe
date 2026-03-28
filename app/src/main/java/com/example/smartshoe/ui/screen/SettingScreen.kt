@@ -49,10 +49,12 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -74,6 +76,7 @@ import com.example.smartshoe.ui.component.DeviceSettingItem
 import com.example.smartshoe.ui.component.ExpandableArrowIcon
 import com.example.smartshoe.ui.component.SmartShoeTextField
 import com.example.smartshoe.ui.component.VersionDetailItem
+import com.example.smartshoe.ui.viewmodel.AuthUiState
 import com.example.smartshoe.ui.viewmodel.SettingViewModel
 import com.example.smartshoe.ui.viewmodel.UploadStatus
 
@@ -1462,12 +1465,24 @@ object SettingScreen {
         hasData: Boolean,
         onGenerateMockData: () -> Unit = {},
         settingViewModel: SettingViewModel? = null,
-        onShowError: ((String) -> Unit)? = null
+        onShowError: ((String) -> Unit)? = null,
+        authUiState: AuthUiState = AuthUiState.Idle
     ) {
         // 使用 SettingViewModel 管理状态
         val showLoginDialog = settingViewModel?.showLoginDialog?.collectAsStateWithLifecycle()?.value ?: false
         val showRegisterDialog = settingViewModel?.showRegisterDialog?.collectAsStateWithLifecycle()?.value ?: false
         val errorMessage = settingViewModel?.errorMessage?.collectAsStateWithLifecycle()?.value
+
+        // 监听认证状态变化，转换为简单参数后委托给ViewModel处理
+        // 避免SettingViewModel直接依赖AuthUiState类型
+        LaunchedEffect(authUiState) {
+            when (authUiState) {
+                is AuthUiState.Success -> settingViewModel?.handleAuthCompleted(success = true)
+                is AuthUiState.Error -> settingViewModel?.handleAuthCompleted(success = false)
+                is AuthUiState.Idle -> settingViewModel?.handleAuthCompleted(success = false)
+                else -> { /* Loading状态不处理 */ }
+            }
+        }
 
         // 显示错误提示 - 通过回调让 Activity 处理
         errorMessage?.let { message ->
@@ -1507,17 +1522,18 @@ object SettingScreen {
                     onPressureAlertsChange = onPressureAlertsChange,
                     onClearCache = onClearCache,
                     onBackupClick = {
-                        // 通过ViewModel统一管理备份流程
-                        settingViewModel?.backupData(
-                            isLoggedIn = isLoggedIn,
-                            hasData = hasData,
-                            onUploadData = { onComplete ->
-                                // 调用MainActivity传入的上传回调
-                                onBackupData(true, "") { success ->
-                                    onComplete(success)
-                                }
+                        // 检查是否可以备份
+                        if (settingViewModel?.canBackup(isLoggedIn, hasData) == true) {
+                            // 设置上传状态为上传中
+                            settingViewModel.setUploadStatus(UploadStatus.UPLOADING)
+                            // 调用MainActivity传入的上传回调
+                            onBackupData(true, "") { success ->
+                                // 根据上传结果更新状态
+                                settingViewModel.setUploadStatus(
+                                    if (success) UploadStatus.SUCCESS else UploadStatus.FAILED
+                                )
                             }
-                        )
+                        }
                     },
                     uploadStatus = uploadStatus,
                     isLoggedIn = isLoggedIn,

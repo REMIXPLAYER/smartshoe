@@ -36,6 +36,7 @@ import com.example.smartshoe.ui.screen.SettingScreen.SettingsScreen
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppDimensions
 import com.example.smartshoe.ui.theme.AppTypography
+import com.example.smartshoe.ui.viewmodel.AuthUiState
 import com.example.smartshoe.ui.viewmodel.SettingViewModel
 import com.example.smartshoe.util.AnimationDefaults
 import java.util.Date
@@ -85,11 +86,13 @@ data class MainScreenCallbacks(
     val onDisconnectDevice: () -> Unit = {},
     // 用户资料
     val onEditWeight: (Float) -> Unit = {},
-    val onEditProfile: (String, String, String, String) -> Unit = { _, _, _, _ -> },
+    val onEditProfile: (String, String, String, String) -> Unit = { _, _, _, _ -> }, // username, email, password, currentPassword
     // 用户认证
     val onLogin: (String, String) -> Unit = { _, _ -> },
     val onRegister: (String, String, String) -> Unit = { _, _, _ -> },
     val onLogout: () -> Unit = {},
+    // 认证UI状态（用于监听登录/注册/修改资料状态变化）
+    val authUiState: AuthUiState = AuthUiState.Idle,
     // 设置
     val onPressureAlertsChange: (Boolean) -> Unit = {},
     // 弹窗
@@ -256,7 +259,8 @@ private fun MainAppScreen(
                         hasData = state.hasData,
                         onGenerateMockData = callbacks.onGenerateMockData,
                         settingViewModel = callbacks.settingViewModel,
-                        onShowError = callbacks.onShowError
+                        onShowError = callbacks.onShowError,
+                        authUiState = callbacks.authUiState
                     )
                 }
             }

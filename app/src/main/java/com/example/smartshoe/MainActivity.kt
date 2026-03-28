@@ -187,7 +187,6 @@ class MainActivity : ComponentActivity() {
                 onEditWeight = { weight -> userProfileViewModel.updateUserWeight(weight) },
                 onEditProfile = { username, email, password, currentPassword ->
                     authViewModel.updateProfile(
-                        userId = authViewModel.userState.value.userId,
                         currentPassword = currentPassword,
                         newUsername = username,
                         newEmail = email,
@@ -198,27 +197,21 @@ class MainActivity : ComponentActivity() {
                 onLogin = { email, password -> authViewModel.login(email, password) },
                 onRegister = { username, email, password -> authViewModel.register(username, email, password) },
                 onLogout = { authViewModel.logout() },
+                // 认证UI状态
+                authUiState = authViewModel.uiState.collectAsStateWithLifecycle().value,
                 // 设置
                 onPressureAlertsChange = { enabled -> sensorDataViewModel.setPressureAlertsEnabled(enabled) },
                 // 弹窗
                 onDismissAlert = { sensorDataViewModel.dismissAlertDialog() },
                 // 缓存和备份
                 onClearCache = { clearAllCache() },
-                onBackupData = { forceUpload, uploadType, onUploadComplete ->
-                    val dataPoints = sensorDataViewModel.getBackupDataForUpload()
-                    
-                    if (dataPoints.isEmpty()) {
-                        onUploadComplete(false)
-                    } else {
-                        sensorDataViewModel.uploadDataToServer(
-                            dataPoints = dataPoints,
-                            onResult = { success, message ->
-                                if (success) {
-                                    historyRecordViewModel.clearHistoryData()
-                                }
-                                onUploadComplete(success)
-                            }
-                        )
+                onBackupData = { _, _, onUploadComplete ->
+                    // 业务逻辑已封装在ViewModel中
+                    sensorDataViewModel.backupData { success ->
+                        if (success) {
+                            historyRecordViewModel.clearHistoryData()
+                        }
+                        onUploadComplete(success)
                     }
                 },
                 // 历史记录
