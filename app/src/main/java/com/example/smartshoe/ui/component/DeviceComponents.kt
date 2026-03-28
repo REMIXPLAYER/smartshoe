@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -196,19 +194,14 @@ fun DeviceSettingItem(
         device.address ?: "未知地址"
     }
 
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
+            .height(50.dp)
+            .background(containerColor)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
             Icon(
                 painter = painterResource(R.drawable.bluetooth),
                 contentDescription = "蓝牙设备",
@@ -257,7 +250,6 @@ fun DeviceSettingItem(
                 )
             }
         }
-    }
 }
 
 /**
