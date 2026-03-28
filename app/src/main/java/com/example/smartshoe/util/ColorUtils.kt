@@ -1,7 +1,6 @@
 package com.example.smartshoe.util
 
-import androidx.compose.ui.graphics.Color
-import kotlin.math.pow
+import com.example.smartshoe.config.AppConfig
 
 /**
  * 颜色工具类
@@ -23,14 +22,14 @@ object ColorUtils {
     val COLOR_MID_HIGH = COLOR_HIGH
 
     // ========== 压力阈值配置 ==========
-    // 新阈值：绿色 0-20%，橙色 20-33%，红色 33-100%
-    const val THRESHOLD_NORMAL = 0.20f     // 正常压力阈值 (0-20%)
-    const val THRESHOLD_HIGH = 0.33f       // 偏高压力阈值 (20-33%)
-    // >33% 为过高压力
+    // 从 AppConfig 读取阈值配置
+    val THRESHOLD_NORMAL = AppConfig.Sensor.COLOR_THRESHOLD_NORMAL
+    val THRESHOLD_HIGH = AppConfig.Sensor.COLOR_THRESHOLD_HIGH
 
     // ========== 加权平均配置 ==========
-    const val DEFAULT_WINDOW_SIZE = 200     // 默认滑动窗口大小（采集数据点数量）
-    const val DEFAULT_WEIGHT_DECAY = 0.9f  // 默认权重衰减系数（越新的数据权重越高）
+    // 从 AppConfig 读取加权平均配置
+    val DEFAULT_WINDOW_SIZE = AppConfig.Sensor.WEIGHTED_WINDOW_SIZE
+    val DEFAULT_WEIGHT_DECAY = AppConfig.Sensor.WEIGHT_DECAY_FACTOR
 
     /**
      * 根据压力值计算显示颜色（渐变渲染版本）

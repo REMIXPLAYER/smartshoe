@@ -40,9 +40,9 @@ class SensorDataRepository @Inject constructor() {
 
     // ========== 滑动窗口加权平均相关 ==========
     // 三个传感器的滑动窗口数据
-    private val sensor1Window = ArrayDeque<Int>(ColorUtils.DEFAULT_WINDOW_SIZE)
-    private val sensor2Window = ArrayDeque<Int>(ColorUtils.DEFAULT_WINDOW_SIZE)
-    private val sensor3Window = ArrayDeque<Int>(ColorUtils.DEFAULT_WINDOW_SIZE)
+    private val sensor1Window = ArrayDeque<Int>(AppConfig.Sensor.WEIGHTED_WINDOW_SIZE)
+    private val sensor2Window = ArrayDeque<Int>(AppConfig.Sensor.WEIGHTED_WINDOW_SIZE)
+    private val sensor3Window = ArrayDeque<Int>(AppConfig.Sensor.WEIGHTED_WINDOW_SIZE)
 
     // 当前加权平均值
     private var sensor1WeightedAvg = 0f
@@ -67,9 +67,10 @@ class SensorDataRepository @Inject constructor() {
                 val values = hexValues.take(3).map { it.toInt(16) }.toMutableList()
                 var extras = hexValues.takeLast(3).map { it.toInt(16) }.toMutableList()
 
-                // 传感器3替代方案：传感器3 = 传感器2 * 9/7
+                // 传感器3替代方案：传感器3 = 传感器2 * MULTIPLIER / DIVISOR
                 if (AppConfig.Sensor.SENSOR3_USE_CALCULATED_VALUE) {
-                    val calculatedSensor3 = (extras[1] * 9 / 7).coerceIn(0, AppConfig.Sensor.SENSOR_MAX_VALUE)
+                    val calculatedSensor3 = (extras[1] * AppConfig.Sensor.SENSOR3_MULTIPLIER / AppConfig.Sensor.SENSOR3_DIVISOR)
+                        .coerceIn(0, AppConfig.Sensor.SENSOR_MAX_VALUE)
                     extras[2] = calculatedSensor3
                     // 同时更新 values 数组（如果蓝牙数据中的 values 也需要更新）
                     if (values.size >= 3) {
@@ -106,19 +107,19 @@ class SensorDataRepository @Inject constructor() {
     ) {
         // 更新传感器1窗口
         sensor1Window.addLast(sensor1Value)
-        if (sensor1Window.size > ColorUtils.DEFAULT_WINDOW_SIZE) {
+        if (sensor1Window.size > AppConfig.Sensor.WEIGHTED_WINDOW_SIZE) {
             sensor1Window.removeFirst()
         }
 
         // 更新传感器2窗口
         sensor2Window.addLast(sensor2Value)
-        if (sensor2Window.size > ColorUtils.DEFAULT_WINDOW_SIZE) {
+        if (sensor2Window.size > AppConfig.Sensor.WEIGHTED_WINDOW_SIZE) {
             sensor2Window.removeFirst()
         }
 
         // 更新传感器3窗口
         sensor3Window.addLast(sensor3Value)
-        if (sensor3Window.size > ColorUtils.DEFAULT_WINDOW_SIZE) {
+        if (sensor3Window.size > AppConfig.Sensor.WEIGHTED_WINDOW_SIZE) {
             sensor3Window.removeFirst()
         }
 

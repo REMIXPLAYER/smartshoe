@@ -35,8 +35,11 @@ object AppConfig {
         // 记录间隔 (毫秒)
         const val RECORDING_INTERVAL_MS = 100L
 
-        // 压力异常阈值
+        // 压力异常阈值（瞬时数值）
         const val PRESSURE_ALERT_THRESHOLD = 4000
+
+        // 报警阈值（滑动窗口加权平均值）
+        const val ALERT_THRESHOLD_WEIGHTED = 1350f
 
         // 传感器最大值 (12位ADC)
         const val SENSOR_MAX_VALUE = 4095
@@ -49,6 +52,18 @@ object AppConfig {
         // 当 SENSOR3_USE_CALCULATED_VALUE = true 时，传感器3的值 = 传感器2 * 9/7
         // 硬件修复后，将此值设为 false 即可恢复原始数据
         const val SENSOR3_USE_CALCULATED_VALUE = true
+
+        // 传感器3计算配置
+        const val SENSOR3_MULTIPLIER = 9
+        const val SENSOR3_DIVISOR = 7
+
+        // 加权平均配置
+        const val WEIGHTED_WINDOW_SIZE = 200         // 滑动窗口大小
+        const val WEIGHT_DECAY_FACTOR = 0.9f         // 权重衰减系数
+
+        // 颜色渲染阈值
+        const val COLOR_THRESHOLD_NORMAL = 0.20f     // 正常压力阈值 (0-20%)
+        const val COLOR_THRESHOLD_HIGH = 0.33f       // 偏高压力阈值 (20-33%)
     }
 
     /**

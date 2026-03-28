@@ -141,8 +141,8 @@ class SensorDataViewModel @Inject constructor(
     }
 
     companion object {
-        // 报警阈值：滑动窗口加权平均值超过此值触发报警
-        const val PRESSURE_ALERT_THRESHOLD = 1350f
+        // 报警阈值：从 AppConfig 读取
+        val PRESSURE_ALERT_THRESHOLD = AppConfig.Sensor.ALERT_THRESHOLD_WEIGHTED
     }
 
     /**
