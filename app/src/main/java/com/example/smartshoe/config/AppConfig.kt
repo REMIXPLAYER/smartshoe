@@ -62,7 +62,7 @@ object AppConfig {
         const val MAX_RETRY_COUNT = 3
 
         // 重试延迟基数 (毫秒)
-        const val RETRY_DELAY_MS = 2000L
+        const val RETRY_DELAY_MS = 500L
 
         // 备份时最大数据点数
         const val MAX_BACKUP_POINTS = 1000
@@ -71,7 +71,7 @@ object AppConfig {
         const val MIN_DATA_POINTS = 100
 
         // 批次间延迟 (毫秒)
-        const val BATCH_DELAY_MS = 100L
+        const val BATCH_DELAY_MS = 20L
 
         // 上传状态重置延迟 (毫秒)
         const val STATUS_RESET_DELAY_MS = 3000L

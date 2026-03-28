@@ -1,6 +1,7 @@
 package com.example.smartshoe.ui.screen
 
 import android.bluetooth.BluetoothDevice
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 
 import androidx.compose.animation.expandVertically
@@ -233,6 +234,7 @@ private fun MainAppScreen(
                 }
 
                 3 -> { // 设置页面
+                    Log.d("BackupDebug", "MainScreen: 传递 onBackupData=${callbacks.onBackupData}")
                     SettingsScreen(
                         modifier = Modifier.padding(innerPadding),
                         scannedDevices = stableScannedDevices,

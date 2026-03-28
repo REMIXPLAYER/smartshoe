@@ -1,6 +1,5 @@
 package com.example.smartshoe.data.remote
 
-import android.util.Log
 import com.example.smartshoe.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,9 +20,9 @@ import java.net.URLEncoder
 abstract class BaseApiService {
 
     companion object {
-        const val DEFAULT_CONNECT_TIMEOUT = 15000
-        const val DEFAULT_READ_TIMEOUT = 15000
-        const val LONG_READ_TIMEOUT = 120000
+        const val DEFAULT_CONNECT_TIMEOUT = 1000
+        const val DEFAULT_READ_TIMEOUT = 1000
+        const val LONG_READ_TIMEOUT = 1000
 
         // 使用 BuildConfig 中的 BASE_URL，支持多环境配置
         val BASE_URL: String = BuildConfig.BASE_URL
@@ -63,17 +62,23 @@ abstract class BaseApiService {
         token: String? = null,
         formData: Map<String, String> = emptyMap(),
         useLongTimeout: Boolean = false
-    ): ApiResult<String> = executeRequest(
-        path = path,
-        method = "POST",
-        token = token,
-        useLongTimeout = useLongTimeout,
-        setupConnection = { it.setRequestProperty("Content-Type", "application/x-www-form-urlencoded") }
-    ) { connection ->
+    ): ApiResult<String> {
         val postData = buildFormData(formData)
-        OutputStreamWriter(connection.outputStream).use { writer ->
-            writer.write(postData)
-            writer.flush()
+        val body = postData.toByteArray(Charsets.UTF_8)
+        return executeRequest(
+            path = path,
+            method = "POST",
+            token = token,
+            useLongTimeout = useLongTimeout,
+            setupConnection = {
+                it.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                it.setFixedLengthStreamingMode(body.size)
+            }
+        ) { connection ->
+            connection.outputStream.use { outputStream ->
+                outputStream.write(body)
+                outputStream.flush()
+            }
         }
     }
 
@@ -82,21 +87,23 @@ abstract class BaseApiService {
         token: String? = null,
         jsonBody: JSONObject,
         useLongTimeout: Boolean = false
-    ): ApiResult<String> = executeRequest(
-        path = path,
-        method = "POST",
-        token = token,
-        useLongTimeout = useLongTimeout,
-        setupConnection = {
-            it.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-            it.setRequestProperty("Accept", "application/json")
-        }
-    ) { connection ->
+    ): ApiResult<String> {
         val body = jsonBody.toString().toByteArray(Charsets.UTF_8)
-        connection.setFixedLengthStreamingMode(body.size)
-        connection.outputStream.use { outputStream ->
-            outputStream.write(body)
-            outputStream.flush()
+        return executeRequest(
+            path = path,
+            method = "POST",
+            token = token,
+            useLongTimeout = useLongTimeout,
+            setupConnection = {
+                it.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                it.setRequestProperty("Accept", "application/json")
+                it.setFixedLengthStreamingMode(body.size)
+            }
+        ) { connection ->
+            connection.outputStream.use { outputStream ->
+                outputStream.write(body)
+                outputStream.flush()
+            }
         }
     }
 
@@ -140,7 +147,6 @@ abstract class BaseApiService {
 
             parseHttpResponse(response, responseCode)
         } catch (e: Exception) {
-            Log.e(TAG, "$method request failed: ${e.message}", e)
             ApiResult.Error(NetworkException.from(e))
         } finally {
             connection?.disconnect()

@@ -758,7 +758,8 @@ object SettingScreen {
         pressureAlertsEnabled: Boolean,
         onPressureAlertsChange: (Boolean) -> Unit,
         onClearCache: () -> Unit,
-        onBackupData: (Boolean, String, (Boolean) -> Unit) -> Unit,
+        onBackupClick: () -> Unit,
+        uploadStatus: UploadStatus,
         isLoggedIn: Boolean,
         hasData: Boolean,
         settingViewModel: SettingViewModel? = null
@@ -766,10 +767,9 @@ object SettingScreen {
         // 使用rememberSaveable保存状态，避免配置变化后状态丢失
         var isDeviceListExpanded by rememberSaveable { mutableStateOf(false) }
 
-        // 使用 SettingViewModel 管理状态
+        // 从ViewModel获取状态
         val isEditingWeight = settingViewModel?.isEditingWeight?.collectAsStateWithLifecycle()?.value ?: false
         val weightInput = settingViewModel?.weightInput?.collectAsStateWithLifecycle()?.value ?: ""
-        val uploadStatus = settingViewModel?.uploadStatus?.collectAsStateWithLifecycle()?.value ?: UploadStatus.IDLE
         val showClearCacheConfirm = settingViewModel?.showClearCacheConfirm?.collectAsStateWithLifecycle()?.value ?: false
 
         Card(
@@ -1039,16 +1039,8 @@ object SettingScreen {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            if (settingViewModel?.canBackup(isLoggedIn, hasData) == true) {
-                                settingViewModel.startBackup()
-                                onBackupData(true, "") { success ->
-                                    if (success) {
-                                        settingViewModel.onBackupSuccess()
-                                    } else {
-                                        settingViewModel.onBackupFailed()
-                                    }
-                                }
-                            }
+                            // UI层只负责触发事件，所有业务逻辑交给ViewModel
+                            onBackupClick()
                         }
                         .height(48.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1389,66 +1381,58 @@ object SettingScreen {
         onClick: () -> Unit,
         trailingContent: @Composable (() -> Unit)? = null
     ) {
-        Card(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
-                .clickable(onClick = onClick),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+                .clickable(onClick = onClick)
+                .height(48.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 根据图标类型显示不同的图标
-                when (icon) {
-                    is AppIcon.MaterialIcon -> {
-                        Icon(
-                            imageVector = icon.icon,
-                            contentDescription = title,
-                            tint = AppColors.Primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    is AppIcon.ResourceIcon -> {
-                        Icon(
-                            painter = painterResource(id = icon.resId),
-                            contentDescription = title,
-                            tint = AppColors.Primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    else -> {}
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = AppColors.OnSurface
-                    )
-                    Text(
-                        subtitle,
-                        fontSize = 14.sp,
-                        color = Color.Gray
+            // 根据图标类型显示不同的图标
+            when (icon) {
+                is AppIcon.MaterialIcon -> {
+                    Icon(
+                        imageVector = icon.icon,
+                        contentDescription = title,
+                        tint = AppColors.Primary,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
-                // 尾部内容：自定义或默认箭头
-                trailingContent?.invoke() ?: Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "更多",
-                    tint = Color.Gray
+                is AppIcon.ResourceIcon -> {
+                    Icon(
+                        painter = painterResource(id = icon.resId),
+                        contentDescription = title,
+                        tint = AppColors.Primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                else -> {}
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AppColors.OnSurface
+                )
+                Text(
+                    subtitle,
+                    fontSize = 12.sp,
+                    color = Color.Gray
                 )
             }
+
+            // 尾部内容：自定义或默认箭头
+            trailingContent?.invoke() ?: Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "更多",
+                tint = Color.Gray
+            )
         }
     }
 
@@ -1501,72 +1485,41 @@ object SettingScreen {
             item {
                 AccountSettingsSection(
                     userState = userState,
-                    onLogin = { email, password ->
-                        settingViewModel?.validateLoginForm()?.let { error ->
-                            settingViewModel.showError(error)
-                            return@AccountSettingsSection
-                        }
-                        settingViewModel?.setLoginLoading(true)
-                        onLogin(email, password)
-                        settingViewModel?.hideLoginDialog()
-                        settingViewModel?.setLoginLoading(false)
-                    },
-                    onRegister = { username, email, password ->
-                        settingViewModel?.validateRegisterForm()?.let { error ->
-                            settingViewModel.showError(error)
-                            return@AccountSettingsSection
-                        }
-                        settingViewModel?.setRegisterLoading(true)
-                        onRegister(username, email, password)
-                        settingViewModel?.hideRegisterDialog()
-                        settingViewModel?.setRegisterLoading(false)
-                    },
+                    onLogin = onLogin,
+                    onRegister = onRegister,
                     onLogout = onLogout,
-                    onEditProfile = { username, email, password, currentPassword ->
-                        settingViewModel?.validateEditProfileForm()?.let { error ->
-                            settingViewModel.showError(error)
-                            return@AccountSettingsSection
-                        }
-                        settingViewModel?.setEditProfileLoading(true)
-                        onEditProfile(username, email, password, currentPassword)
-                        settingViewModel?.toggleEditProfileExpanded()
-                        settingViewModel?.setEditProfileLoading(false)
-                    },
+                    onEditProfile = onEditProfile,
                     settingViewModel = settingViewModel
                 )
             }
             item {
                 // 设备与偏好设置组合卡片
+                val uploadStatus = settingViewModel?.uploadStatus?.collectAsStateWithLifecycle()?.value ?: UploadStatus.IDLE
+                
                 DeviceAndPreferenceSection(
                     scannedDevices = scannedDevices,
                     connectedDevice = connectedDevice,
                     onConnectDevice = onConnectDevice,
                     onDisconnectDevice = onDisconnectDevice,
                     userWeight = userWeight,
-                    onEditWeight = { weight ->
-                        onEditWeight(weight)
-                        settingViewModel?.cancelEditingWeight()
-                    },
+                    onEditWeight = onEditWeight,
                     pressureAlertsEnabled = pressureAlertsEnabled,
                     onPressureAlertsChange = onPressureAlertsChange,
-                    onClearCache = {
-                        settingViewModel?.showClearCacheConfirmDialog()
-                    },
-                    onBackupData = { forceUpload, uploadType, onComplete ->
-                        settingViewModel?.let { viewModel ->
-                            if (viewModel.canBackup(isLoggedIn, hasData)) {
-                                viewModel.startBackup()
-                                onBackupData(forceUpload, uploadType) { success ->
-                                    if (success) {
-                                        viewModel.onBackupSuccess()
-                                    } else {
-                                        viewModel.onBackupFailed()
-                                    }
+                    onClearCache = onClearCache,
+                    onBackupClick = {
+                        // 通过ViewModel统一管理备份流程
+                        settingViewModel?.backupData(
+                            isLoggedIn = isLoggedIn,
+                            hasData = hasData,
+                            onUploadData = { onComplete ->
+                                // 调用MainActivity传入的上传回调
+                                onBackupData(true, "") { success ->
                                     onComplete(success)
                                 }
                             }
-                        }
+                        )
                     },
+                    uploadStatus = uploadStatus,
                     isLoggedIn = isLoggedIn,
                     hasData = hasData,
                     settingViewModel = settingViewModel
@@ -1581,14 +1534,14 @@ object SettingScreen {
             LoginDialog(
                 onDismiss = { settingViewModel?.hideLoginDialog() },
                 onLogin = { email, password ->
+                    // 验证表单
                     settingViewModel?.validateLoginForm()?.let { error ->
                         settingViewModel.showError(error)
                         return@LoginDialog
                     }
+                    // 执行登录
                     settingViewModel?.setLoginLoading(true)
                     onLogin(email, password)
-                    settingViewModel?.hideLoginDialog()
-                    settingViewModel?.setLoginLoading(false)
                 },
                 onSwitchToRegister = { settingViewModel?.switchToRegister() },
                 viewModel = settingViewModel
@@ -1600,14 +1553,14 @@ object SettingScreen {
             RegisterDialog(
                 onDismiss = { settingViewModel?.hideRegisterDialog() },
                 onRegister = { username, email, password ->
+                    // 验证表单
                     settingViewModel?.validateRegisterForm()?.let { error ->
                         settingViewModel.showError(error)
                         return@RegisterDialog
                     }
+                    // 执行注册
                     settingViewModel?.setRegisterLoading(true)
                     onRegister(username, email, password)
-                    settingViewModel?.hideRegisterDialog()
-                    settingViewModel?.setRegisterLoading(false)
                 },
                 onSwitchToLogin = { settingViewModel?.switchToLogin() },
                 viewModel = settingViewModel

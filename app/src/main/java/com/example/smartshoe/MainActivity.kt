@@ -206,13 +206,20 @@ class MainActivity : ComponentActivity() {
                 onClearCache = { clearAllCache() },
                 onBackupData = { forceUpload, uploadType, onUploadComplete ->
                     val dataPoints = sensorDataViewModel.getBackupDataForUpload()
-                    sensorDataViewModel.uploadDataToServer(
-                        dataPoints = dataPoints,
-                        onResult = { success, _ ->
-                            if (success) historyRecordViewModel.clearHistoryData()
-                            onUploadComplete(success)
-                        }
-                    )
+                    
+                    if (dataPoints.isEmpty()) {
+                        onUploadComplete(false)
+                    } else {
+                        sensorDataViewModel.uploadDataToServer(
+                            dataPoints = dataPoints,
+                            onResult = { success, message ->
+                                if (success) {
+                                    historyRecordViewModel.clearHistoryData()
+                                }
+                                onUploadComplete(success)
+                            }
+                        )
+                    }
                 },
                 // 历史记录
                 onQueryHistory = { historyRecordViewModel.queryHistoryRecords() },

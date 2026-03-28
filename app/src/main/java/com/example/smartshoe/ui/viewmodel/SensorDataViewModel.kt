@@ -1,5 +1,6 @@
 package com.example.smartshoe.ui.viewmodel
 
+import android.util.Log
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -211,20 +212,28 @@ class SensorDataViewModel @Inject constructor(
         dataPoints: List<SensorDataPoint>,
         onResult: (Boolean, String) -> Unit
     ) {
+        Log.d("BackupDebug", "========== SensorDataViewModel.uploadDataToServer 被调用 ==========")
+        Log.d("BackupDebug", "数据点数量: ${dataPoints.size}")
+        
         // 检查登录状态
         if (!sensorDataManager.isLoggedIn()) {
+            Log.w("BackupDebug", "未登录，无法上传")
             onResult(false, "请先登录后再上传数据")
             return
         }
+        Log.d("BackupDebug", "已登录，继续上传流程")
 
         // 检查数据是否为空
         if (dataPoints.isEmpty()) {
+            Log.w("BackupDebug", "数据为空，无法上传")
             onResult(false, "没有数据可上传")
             return
         }
 
         // 调用 Manager 上传数据
+        Log.d("BackupDebug", "调用 sensorDataManager.uploadSensorData()")
         sensorDataManager.uploadSensorData(dataPoints) { success, message, info ->
+            Log.d("BackupDebug", "sensorDataManager.uploadSensorData 回调: success=$success, message=$message")
             val resultMessage = if (success && info != null) {
                 val compressionInfo = String.format(
                     "压缩率: %.1f%% (${info.originalSize}B → ${info.compressedSize}B)",

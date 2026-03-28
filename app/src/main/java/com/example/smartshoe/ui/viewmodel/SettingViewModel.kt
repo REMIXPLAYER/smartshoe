@@ -6,6 +6,7 @@ import com.example.smartshoe.data.manager.SensorDataManager
 import com.example.smartshoe.data.model.UserState
 import com.example.smartshoe.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -321,16 +322,39 @@ class SettingViewModel @Inject constructor(
 
     // ==================== 数据备份相关方法 ====================
 
-    fun startBackup() {
+    /**
+     * 执行数据备份（统一管理备份流程）
+     * @param isLoggedIn 是否已登录
+     * @param hasData 是否有数据
+     * @param onUploadData 实际上传数据的回调（由MainActivity提供）
+     */
+    fun backupData(
+        isLoggedIn: Boolean,
+        hasData: Boolean,
+        onUploadData: (onComplete: (Boolean) -> Unit) -> Unit
+    ) {
+        // 1. 检查是否可以备份
+        if (!canBackup(isLoggedIn, hasData)) {
+            return
+        }
+
+        // 2. 设置上传状态
         _uploadStatus.value = UploadStatus.UPLOADING
-    }
 
-    fun onBackupSuccess() {
-        _uploadStatus.value = UploadStatus.SUCCESS
-    }
-
-    fun onBackupFailed() {
-        _uploadStatus.value = UploadStatus.FAILED
+        // 3. 执行上传
+        onUploadData { success ->
+            if (success) {
+                _uploadStatus.value = UploadStatus.SUCCESS
+            } else {
+                _uploadStatus.value = UploadStatus.FAILED
+            }
+            
+            // 3秒后重置状态
+            viewModelScope.launch {
+                delay(3000)
+                _uploadStatus.value = UploadStatus.IDLE
+            }
+        }
     }
 
     fun resetUploadStatus() {
