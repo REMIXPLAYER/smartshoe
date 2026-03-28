@@ -32,7 +32,8 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://10.0.2.2:8080/api\""
+                "\"http://47.93.41.158:8080/api\""
+                //http://10.0.2.2:8080/api
             )
         }
         release {
@@ -46,7 +47,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://your-production-server.com/api\""
+                "\"http://47.93.41.158:8080/api\""
             )
         }
     }

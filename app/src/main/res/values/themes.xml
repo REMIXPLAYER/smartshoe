@@ -1,5 +1,17 @@
 <resources>
-    <!-- 使用最基本的系统主题 -->
-    <style name="Base.Theme.Smartshoe" parent="android:Theme.Material.Light.NoActionBar" />
-    <style name="Theme.Smartshoe" parent="Base.Theme.Smartshoe" />
+    <!-- 使用最基本的系统主题，强制无ActionBar -->
+    <style name="Base.Theme.Smartshoe" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 禁用窗口标题 -->
+        <item name="android:windowNoTitle">true</item>
+        <!-- 禁用ActionBar -->
+        <item name="android:windowActionBar">false</item>
+        <!-- 全屏模式（可选） -->
+        <item name="android:windowFullscreen">false</item>
+    </style>
+    
+    <style name="Theme.Smartshoe" parent="Base.Theme.Smartshoe">
+        <!-- 透明状态栏（可选） -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>

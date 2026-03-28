@@ -1,6 +1,7 @@
 package com.example.smartshoe
 
 import android.Manifest
+import android.app.DatePickerDialog
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +13,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import java.util.Calendar
+import java.util.Date
 import javax.inject.Inject
 import com.example.smartshoe.data.manager.BluetoothConnectionManager
 import com.example.smartshoe.data.manager.CacheManager
@@ -21,6 +24,7 @@ import com.example.smartshoe.ui.viewmodel.BluetoothViewModel
 import com.example.smartshoe.ui.viewmodel.HistoryRecordViewModel
 import com.example.smartshoe.ui.viewmodel.MainViewModel
 import com.example.smartshoe.ui.viewmodel.SensorDataViewModel
+import com.example.smartshoe.ui.viewmodel.SettingViewModel
 import com.example.smartshoe.ui.viewmodel.UserProfileViewModel
 import com.example.smartshoe.ui.screen.MainScreen
 import com.example.smartshoe.ui.screen.MainScreenState
@@ -43,6 +47,7 @@ class MainActivity : ComponentActivity() {
     private val historyRecordViewModel: HistoryRecordViewModel by viewModels()
     private val userProfileViewModel: UserProfileViewModel by viewModels()
     private val mainViewModel: MainViewModel by viewModels()
+    private val settingViewModel: SettingViewModel by viewModels()
     // 通过 Hilt 注入蓝牙连接管理器
     @Inject
     lateinit var bluetoothConnectionManager: BluetoothConnectionManager
@@ -87,6 +92,13 @@ class MainActivity : ComponentActivity() {
      * 设置蓝牙适配器、请求权限、初始化UI
      */
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 在 super.onCreate 之前配置窗口属性，确保无标题栏
+        // 方法1: 使用 NoActionBar 主题
+        // 方法2: 代码强制隐藏标题栏（针对某些手机厂商的定制系统）
+        
+        // 尝试多种方式隐藏标题栏
+        requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        
         super.onCreate(savedInstanceState)
 
         // 初始化蓝牙连接管理器的回调
@@ -207,12 +219,21 @@ class MainActivity : ComponentActivity() {
                 onRecordSelect = { record -> historyRecordViewModel.selectRecord(record) },
                 onStartDateChange = { date -> historyRecordViewModel.updateStartDate(date) },
                 onEndDateChange = { date -> historyRecordViewModel.updateEndDate(date) },
+                onShowDatePicker = { initialDate, onDateSelected ->
+                    showDatePicker(initialDate, onDateSelected)
+                },
                 // 导航
                 onTabSelected = { tabIndex -> mainViewModel.selectTab(tabIndex) },
                 // Debug
                 onGenerateMockData = {
                     sensorDataViewModel.generateMockData()
                     Toast.makeText(this@MainActivity, "已生成模拟数据", Toast.LENGTH_SHORT).show()
+                },
+                // SettingViewModel
+                settingViewModel = settingViewModel,
+                // 错误提示
+                onShowError = { message ->
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
                 }
             )
 
@@ -226,10 +247,33 @@ class MainActivity : ComponentActivity() {
 
 
     /**
-     * 清除所有缓存
-     * 包括：用户数据、传感器数据、历史记录、蓝牙设备、文件缓存等
-     *
-     * 职责拆分：
+     * 显示日期选择器
+     * @param initialDate 初始日期
+     * @param onDateSelected 日期选择回调
+     */
+    private fun showDatePicker(initialDate: Date, onDateSelected: (Date) -> Unit) {
+        val calendar = Calendar.getInstance()
+        calendar.time = initialDate
+
+        DatePickerDialog(
+            this,
+            { _, year, month, dayOfMonth ->
+                calendar.set(Calendar.YEAR, year)
+                calendar.set(Calendar.MONTH, month)
+                calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                onDateSelected(calendar.time)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    /**
+     * 清除所有应用缓存
+     * 包括：业务数据、用户偏好设置、文件缓存
+     * 
+     * 清理流程：
      * - 业务数据清理：由各 ViewModel 处理
      * - 文件缓存清理：由 CacheManager 处理
      * - 用户偏好设置：由 CacheManager 委托 UserPreferencesManager 处理

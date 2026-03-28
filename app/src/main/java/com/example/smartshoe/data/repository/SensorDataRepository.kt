@@ -45,8 +45,18 @@ class SensorDataRepository @Inject constructor() {
         val hexValues = data.trim().split(",")
         if (hexValues.size >= 6) {
             try {
-                val values = hexValues.take(3).map { it.toInt(16) }
-                val extras = hexValues.takeLast(3).map { it.toInt(16) }
+                val values = hexValues.take(3).map { it.toInt(16) }.toMutableList()
+                var extras = hexValues.takeLast(3).map { it.toInt(16) }.toMutableList()
+
+                // 传感器3替代方案：当硬件损坏时，使用传感器1和2的平均值
+                if (AppConfig.Sensor.SENSOR3_USE_CALCULATED_VALUE) {
+                    val calculatedSensor3 = (extras[0] + extras[1]) / 2
+                    extras[2] = calculatedSensor3
+                    // 同时更新 values 数组（如果蓝牙数据中的 values 也需要更新）
+                    if (values.size >= 3) {
+                        values[2] = calculatedSensor3
+                    }
+                }
 
                 if (shouldRecord) {
                     autoRecordData(extras[0], extras[1], extras[2])

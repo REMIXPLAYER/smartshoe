@@ -1,10 +1,8 @@
 package com.example.smartshoe.ui.screen
 
-import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
@@ -14,14 +12,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -32,12 +27,15 @@ import com.example.smartshoe.R
 import com.example.smartshoe.data.model.SensorDataPoint
 import com.example.smartshoe.data.model.UserState
 import com.example.smartshoe.ui.component.BottomNavigation.BottomNavigationBar
+import com.example.smartshoe.ui.component.ExpandableArrowIcon
+import com.example.smartshoe.ui.component.getDeviceDisplayName
 import com.example.smartshoe.ui.component.sensor.SensorCanvas.InsoleWithSensors
 import com.example.smartshoe.ui.screen.DataRecordScreen.DataRecordScreen
 import com.example.smartshoe.ui.screen.SettingScreen.SettingsScreen
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppDimensions
 import com.example.smartshoe.ui.theme.AppTypography
+import com.example.smartshoe.ui.viewmodel.SettingViewModel
 import com.example.smartshoe.util.AnimationDefaults
 import java.util.Date
 
@@ -103,32 +101,16 @@ data class MainScreenCallbacks(
     val onRecordSelect: (com.example.smartshoe.data.model.SensorDataRecord?) -> Unit = {},
     val onStartDateChange: (Date?) -> Unit = {},
     val onEndDateChange: (Date?) -> Unit = {},
+    val onShowDatePicker: ((Date, (Date) -> Unit) -> Unit)? = null,
     // 导航
     val onTabSelected: (Int) -> Unit = {},
     // Debug
-    val onGenerateMockData: () -> Unit = {}
+    val onGenerateMockData: () -> Unit = {},
+    // SettingViewModel
+    val settingViewModel: SettingViewModel? = null,
+    // 错误提示
+    val onShowError: ((String) -> Unit)? = null
 )
-
-/**
- * 获取设备显示名称的辅助函数
- * 优先使用设备名称，如果名称为空则使用MAC地址
- */
-@SuppressLint("MissingPermission")
-fun getDeviceDisplayName(device: BluetoothDevice): String {
-    return when {
-        !device.name.isNullOrBlank() -> device.name!!
-        !device.address.isNullOrBlank() -> formatMacAddress(device.address!!)
-        else -> "未知设备"
-    }
-}
-
-/**
- * 格式化MAC地址，使其更易读
- * 例如：04:34:C3:05:7E:45 -> 设备 04:34:C3:05:7E:45
- */
-fun formatMacAddress(macAddress: String): String {
-    return "设备 $macAddress"
-}
 
 /**
  * 主屏幕组件（简化版）
@@ -245,7 +227,8 @@ private fun MainAppScreen(
                         onEndDateChange = callbacks.onEndDateChange,
                         onQueryClick = callbacks.onQueryHistory,
                         onRecordSelect = callbacks.onRecordSelect,
-                        queryExecuted = state.queryExecuted
+                        queryExecuted = state.queryExecuted,
+                        onShowDatePicker = callbacks.onShowDatePicker
                     )
                 }
 
@@ -269,7 +252,9 @@ private fun MainAppScreen(
                         onBackupData = callbacks.onBackupData,
                         isLoggedIn = state.isLoggedIn,
                         hasData = state.hasData,
-                        onGenerateMockData = callbacks.onGenerateMockData
+                        onGenerateMockData = callbacks.onGenerateMockData,
+                        settingViewModel = callbacks.settingViewModel,
+                        onShowError = callbacks.onShowError
                     )
                 }
             }
@@ -374,12 +359,6 @@ fun ExpandableDeviceListSection(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
-    val arrowRotation by animateFloatAsState(
-        targetValue = if (isExpanded) 90f else 0f,
-        animationSpec = tween(durationMillis = AnimationDefaults.DURATION_LONG),
-        label = "arrow_rotation"
-    )
-
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
@@ -453,15 +432,10 @@ fun ExpandableDeviceListSection(
                         )
                     }
 
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = if (isExpanded) "收起" else "展开",
-                        tint = Color.Gray,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .graphicsLayer {
-                                rotationZ = arrowRotation
-                            }
+                    ExpandableArrowIcon(
+                        isExpanded = isExpanded,
+                        size = 24.dp,
+                        useGraphicsLayer = false
                     )
                 }
             }
@@ -511,30 +485,6 @@ fun ExpandableDeviceListSection(
                         }
                     }
 
-                    if (connectedDevice != null && isExpanded) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .background(Color.Green, CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    "设备已连接",
-                                    fontSize = 14.sp,
-                                    color = Color.Green,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }

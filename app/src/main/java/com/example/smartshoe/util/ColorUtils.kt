@@ -14,15 +14,21 @@ object ColorUtils {
     val COLOR_MID_HIGH = Color(0xFFFF937E) // 橙色 - 中高压力
     val COLOR_HIGH = Color(0xFFFF5555)     // 红色 - 高压力
     val COLOR_DEFAULT = Color.Gray         // 默认颜色
+    val COLOR_ZERO = Color(0xFF9E9E9E)     // 浅灰色 - 数值为0时显示（与模拟器一致）
 
     /**
      * 根据压力值计算显示颜色
-     * 压力值越低越接近淡绿色，越高越接近红色
+     * 压力值为0时显示浅灰色，有数值时根据压力显示对应颜色
      *
      * @param value 压力值 (0-4095)
      * @return 对应的颜色
      */
     fun calculateColorFromPressure(value: Int): Color {
+        // 数值为0时显示浅灰色
+        if (value == 0) {
+            return COLOR_ZERO
+        }
+
         val normalizedValue = value.coerceIn(0, 4095) / 4095f
 
         return when {

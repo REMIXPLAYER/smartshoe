@@ -1,6 +1,5 @@
 package com.example.smartshoe.ui.screen
 
-import android.app.DatePickerDialog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -20,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -57,7 +55,8 @@ object HistoryScreen {
         onQueryClick: () -> Unit,
         onRecordSelect: (SensorDataRecord?) -> Unit,
         queryExecuted: Boolean = false,
-        modifier: Modifier = Modifier
+        modifier: Modifier = Modifier,
+        onShowDatePicker: ((Date, (Date) -> Unit) -> Unit)? = null
     ) {
         Box(
             modifier = modifier
@@ -86,7 +85,8 @@ object HistoryScreen {
                         } else {
                             onRecordSelect(record)
                         }
-                    }
+                    },
+                    onShowDatePicker = onShowDatePicker
                 )
 
                 // 查询加载指示器
@@ -146,10 +146,9 @@ object HistoryScreen {
         records: List<SensorDataRecord>,
         selectedRecord: SensorDataRecord?,
         queryExecuted: Boolean = false,
-        onRecordToggle: (SensorDataRecord) -> Unit
+        onRecordToggle: (SensorDataRecord) -> Unit,
+        onShowDatePicker: ((Date, (Date) -> Unit) -> Unit)? = null
     ) {
-        val context = LocalContext.current
-
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -175,7 +174,7 @@ object HistoryScreen {
                     // 开始时间
                     OutlinedButton(
                         onClick = {
-                            showDatePicker(context, startDate ?: Date()) { newDate ->
+                            onShowDatePicker?.invoke(startDate ?: Date()) { newDate ->
                                 // 设置开始时间为当天的00:00:00
                                 val calendar = Calendar.getInstance()
                                 calendar.time = newDate
@@ -214,7 +213,7 @@ object HistoryScreen {
                     // 结束时间
                     OutlinedButton(
                         onClick = {
-                            showDatePicker(context, endDate ?: Date()) { newDate ->
+                            onShowDatePicker?.invoke(endDate ?: Date()) { newDate ->
                                 // 设置结束时间为当天的23:59:59
                                 val calendar = Calendar.getInstance()
                                 calendar.time = newDate
@@ -774,28 +773,4 @@ object HistoryScreen {
         }
     }
 
-    /**
-     * 显示日期选择器（仅日期，无时间）
-     */
-    private fun showDatePicker(
-        context: android.content.Context,
-        initialDate: Date,
-        onDateSelected: (Date) -> Unit
-    ) {
-        val calendar = Calendar.getInstance()
-        calendar.time = initialDate
-
-        DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                calendar.set(Calendar.YEAR, year)
-                calendar.set(Calendar.MONTH, month)
-                calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth)
-                onDateSelected(calendar.time)
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        ).show()
-    }
 }

@@ -1,10 +1,7 @@
 package com.example.smartshoe.ui.screen
 
 import android.bluetooth.BluetoothDevice
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import com.example.smartshoe.util.AnimationDefaults
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -26,18 +23,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
@@ -56,28 +51,31 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
-
 import androidx.compose.ui.window.Dialog
 import com.example.smartshoe.R
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppIcon
 import com.example.smartshoe.ui.theme.AppIcons
 import com.example.smartshoe.data.model.UserState
+import com.example.smartshoe.debug.ui.DebugSection
+import com.example.smartshoe.ui.component.DeviceListContent
+import com.example.smartshoe.ui.component.DeviceListHeader
+import com.example.smartshoe.ui.component.DeviceSettingItem
+import com.example.smartshoe.ui.component.ExpandableArrowIcon
 import com.example.smartshoe.ui.component.SmartShoeTextField
+import com.example.smartshoe.ui.component.VersionDetailItem
+import com.example.smartshoe.ui.viewmodel.SettingViewModel
+import com.example.smartshoe.ui.viewmodel.UploadStatus
 
 object SettingScreen {
 
@@ -89,11 +87,8 @@ object SettingScreen {
         onRegister: (String, String, String) -> Unit,
         onLogout: () -> Unit,
         onEditProfile: (String, String, String, String) -> Unit,
+        settingViewModel: SettingViewModel? = null
     ) {
-        // 使用rememberSaveable保存弹窗状态，避免配置变化后状态丢失
-        var showLoginDialog by rememberSaveable { mutableStateOf(false) }
-        var showRegisterDialog by rememberSaveable { mutableStateOf(false) }
-
         Card(
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
             colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
@@ -104,43 +99,16 @@ object SettingScreen {
                     LoggedInView(
                         userState = userState,
                         onEditProfile = onEditProfile,
-                        onLogout = onLogout
+                        onLogout = onLogout,
+                        settingViewModel = settingViewModel
                     )
                 } else {
                     LoggedOutView(
-                        onLoginClick = { showLoginDialog = true },
-                        onRegisterClick = { showRegisterDialog = true }
+                        onLoginClick = { settingViewModel?.showLoginDialog() },
+                        onRegisterClick = { settingViewModel?.showRegisterDialog() }
                     )
                 }
             }
-        }
-
-        if (showLoginDialog) {
-            LoginDialog(
-                onDismiss = { showLoginDialog = false },
-                onLogin = { email, password ->
-                    onLogin(email, password)
-                    showLoginDialog = false
-                },
-                onSwitchToRegister = {
-                    showLoginDialog = false
-                    showRegisterDialog = true
-                }
-            )
-        }
-
-        if (showRegisterDialog) {
-            RegisterDialog(
-                onDismiss = { showRegisterDialog = false },
-                onRegister = { username, email, password ->
-                    onRegister(username, email, password)
-                    showRegisterDialog = false
-                },
-                onSwitchToLogin = {
-                    showRegisterDialog = false
-                    showLoginDialog = true
-                }
-            )
         }
     }
 
@@ -287,23 +255,29 @@ object SettingScreen {
     private fun LoggedInView(
         userState: UserState,
         onEditProfile: (String, String, String, String) -> Unit,
-        onLogout: () -> Unit
+        onLogout: () -> Unit,
+        settingViewModel: SettingViewModel? = null
     ) {
-        // 使用rememberSaveable保存编辑状态，避免配置变化后丢失
-        var isEditExpanded by rememberSaveable { mutableStateOf(false) }
-        var username by rememberSaveable { mutableStateOf(userState.username) }
-        var email by rememberSaveable { mutableStateOf(userState.email) }
-        var currentPassword by rememberSaveable { mutableStateOf("") }
-        var newPassword by rememberSaveable { mutableStateOf("") }
-        var confirmPassword by rememberSaveable { mutableStateOf("") }
-        var passwordVisible by rememberSaveable { mutableStateOf(false) }
-        var isLoading by remember { mutableStateOf(false) }
+        // 使用 SettingViewModel 管理状态
+        val isEditExpanded = settingViewModel?.isEditProfileExpanded?.collectAsStateWithLifecycle()?.value ?: false
+        val username = settingViewModel?.editProfileUsername?.collectAsStateWithLifecycle()?.value ?: userState.username
+        val email = settingViewModel?.editProfileEmail?.collectAsStateWithLifecycle()?.value ?: userState.email
+        val currentPassword = settingViewModel?.editProfileCurrentPassword?.collectAsStateWithLifecycle()?.value ?: ""
+        val newPassword = settingViewModel?.editProfileNewPassword?.collectAsStateWithLifecycle()?.value ?: ""
+        val confirmPassword = settingViewModel?.editProfileConfirmPassword?.collectAsStateWithLifecycle()?.value ?: ""
+        val passwordVisible = settingViewModel?.editProfilePasswordVisible?.collectAsStateWithLifecycle()?.value ?: false
+        val isLoading = settingViewModel?.isEditProfileLoading?.collectAsStateWithLifecycle()?.value ?: false
+
+        // 初始化表单数据
+        if (settingViewModel != null && !isEditExpanded) {
+            settingViewModel.initEditProfileForm(userState)
+        }
 
         val passwordsMatch = newPassword == confirmPassword || newPassword.isEmpty()
-        val isFormValid = username.isNotBlank() &&
+        val isFormValid = settingViewModel?.isEditProfileFormValid() ?: (username.isNotBlank() &&
                 email.isNotBlank() &&
                 currentPassword.isNotBlank() &&
-                passwordsMatch
+                passwordsMatch)
 
         Column {
             // 用户信息摘要
@@ -350,7 +324,7 @@ object SettingScreen {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { isEditExpanded = !isEditExpanded }
+                    .clickable { settingViewModel?.toggleEditProfileExpanded() }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -377,15 +351,9 @@ object SettingScreen {
                     )
                 }
 
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = if (isEditExpanded) "收起" else "展开",
-                    tint = Color.Gray,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .graphicsLayer {
-                            rotationZ = if (isEditExpanded) 90f else 0f
-                        }
+                ExpandableArrowIcon(
+                    isExpanded = isEditExpanded,
+                    useGraphicsLayer = true
                 )
             }
 
@@ -401,27 +369,24 @@ object SettingScreen {
             ) {
                 EditProfileForm(
                     username = username,
-                    onUsernameChange = { username = it },
+                    onUsernameChange = { settingViewModel?.onEditProfileUsernameChange(it) },
                     email = email,
-                    onEmailChange = { email = it },
+                    onEmailChange = { settingViewModel?.onEditProfileEmailChange(it) },
                     currentPassword = currentPassword,
-                    onCurrentPasswordChange = { currentPassword = it },
+                    onCurrentPasswordChange = { settingViewModel?.onEditProfileCurrentPasswordChange(it) },
                     newPassword = newPassword,
-                    onNewPasswordChange = { newPassword = it },
+                    onNewPasswordChange = { settingViewModel?.onEditProfileNewPasswordChange(it) },
                     confirmPassword = confirmPassword,
-                    onConfirmPasswordChange = { confirmPassword = it },
+                    onConfirmPasswordChange = { settingViewModel?.onEditProfileConfirmPasswordChange(it) },
                     passwordVisible = passwordVisible,
-                    onPasswordVisibleChange = { passwordVisible = it },
+                    onPasswordVisibleChange = { settingViewModel?.onEditProfilePasswordVisibilityChange(it) },
                     passwordsMatch = passwordsMatch,
                     isFormValid = isFormValid,
                     isLoading = isLoading,
                     onSave = {
-                        isLoading = true
                         onEditProfile(username, email, newPassword, currentPassword)
-                        isLoading = false
-                        isEditExpanded = false
                     },
-                    onCancel = { isEditExpanded = false }
+                    onCancel = { settingViewModel?.toggleEditProfileExpanded() }
                 )
             }
 
@@ -482,13 +447,15 @@ object SettingScreen {
     private fun LoginDialog(
         onDismiss: () -> Unit,
         onLogin: (String, String) -> Unit,
-        onSwitchToRegister: () -> Unit
+        onSwitchToRegister: () -> Unit,
+        onShowError: (String) -> Unit = {},
+        viewModel: SettingViewModel? = null
     ) {
-        var email by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-        var passwordVisible by remember { mutableStateOf(false) }
-        var isLoading by remember { mutableStateOf(false) }
-        val context = LocalContext.current
+        // 使用 SettingViewModel 管理状态
+        val email = viewModel?.loginEmail?.collectAsStateWithLifecycle()?.value ?: ""
+        val password = viewModel?.loginPassword?.collectAsStateWithLifecycle()?.value ?: ""
+        val passwordVisible = viewModel?.loginPasswordVisible?.collectAsStateWithLifecycle()?.value ?: false
+        val isLoading = viewModel?.isLoginLoading?.collectAsStateWithLifecycle()?.value ?: false
         val scrollState = rememberScrollState()
 
         Dialog(
@@ -526,7 +493,7 @@ object SettingScreen {
                     // 邮箱输入
                     SmartShoeTextField.Email(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { viewModel?.onLoginEmailChange(it) },
                         label = "邮箱地址",
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = Icons.Default.Email
@@ -537,10 +504,10 @@ object SettingScreen {
                     // 密码输入
                     SmartShoeTextField.Password(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = { viewModel?.onLoginPasswordChange(it) },
                         label = "密码",
                         passwordVisible = passwordVisible,
-                        onPasswordVisibilityChange = { passwordVisible = !passwordVisible },
+                        onPasswordVisibilityChange = { viewModel?.onLoginPasswordVisibilityChange(!passwordVisible) },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = Icons.Default.Lock,
                         visibilityIcon = painterResource(R.drawable.visibility),
@@ -552,13 +519,7 @@ object SettingScreen {
                     // 登录按钮
                     Button(
                         onClick = {
-                            if (email.isBlank() || password.isBlank()) {
-                                Toast.makeText(context, "请输入邮箱和密码", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-                            isLoading = true
                             onLogin(email, password)
-                            isLoading = false
                         },
                         enabled = !isLoading,
                         modifier = Modifier
@@ -620,16 +581,18 @@ object SettingScreen {
     private fun RegisterDialog(
         onDismiss: () -> Unit,
         onRegister: (String, String, String) -> Unit,
-        onSwitchToLogin: () -> Unit
+        onSwitchToLogin: () -> Unit,
+        onShowError: (String) -> Unit = {},
+        viewModel: SettingViewModel? = null
     ) {
-        var username by remember { mutableStateOf("") }
-        var email by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-        var confirmPassword by remember { mutableStateOf("") }
-        var passwordVisible by remember { mutableStateOf(false) }
-        var isLoading by remember { mutableStateOf(false) }
-        var passwordsMatch by remember { mutableStateOf(true) }
-        val context = LocalContext.current
+        // 使用 SettingViewModel 管理状态
+        val username = viewModel?.registerUsername?.collectAsStateWithLifecycle()?.value ?: ""
+        val email = viewModel?.registerEmail?.collectAsStateWithLifecycle()?.value ?: ""
+        val password = viewModel?.registerPassword?.collectAsStateWithLifecycle()?.value ?: ""
+        val confirmPassword = viewModel?.registerConfirmPassword?.collectAsStateWithLifecycle()?.value ?: ""
+        val passwordVisible = viewModel?.registerPasswordVisible?.collectAsStateWithLifecycle()?.value ?: false
+        val isLoading = viewModel?.isRegisterLoading?.collectAsStateWithLifecycle()?.value ?: false
+        val passwordsMatch = password == confirmPassword || password.isEmpty()
         val scrollState = rememberScrollState()
 
         Dialog(
@@ -667,7 +630,7 @@ object SettingScreen {
                     // 用户名输入
                     SmartShoeTextField.Username(
                         value = username,
-                        onValueChange = { username = it },
+                        onValueChange = { viewModel?.onRegisterUsernameChange(it) },
                         label = "用户名",
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = Icons.Default.Person
@@ -678,7 +641,7 @@ object SettingScreen {
                     // 邮箱输入
                     SmartShoeTextField.Email(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { viewModel?.onRegisterEmailChange(it) },
                         label = "邮箱地址",
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = Icons.Default.Email
@@ -689,13 +652,10 @@ object SettingScreen {
                     // 密码输入
                     SmartShoeTextField.Password(
                         value = password,
-                        onValueChange = {
-                            password = it
-                            passwordsMatch = it == confirmPassword
-                        },
+                        onValueChange = { viewModel?.onRegisterPasswordChange(it) },
                         label = "密码",
                         passwordVisible = passwordVisible,
-                        onPasswordVisibilityChange = { passwordVisible = !passwordVisible },
+                        onPasswordVisibilityChange = { viewModel?.onRegisterPasswordVisibilityChange(!passwordVisible) },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = Icons.Default.Lock,
                         visibilityIcon = painterResource(R.drawable.visibility),
@@ -707,13 +667,10 @@ object SettingScreen {
                     // 确认密码输入
                     SmartShoeTextField.Password(
                         value = confirmPassword,
-                        onValueChange = {
-                            confirmPassword = it
-                            passwordsMatch = password == it
-                        },
+                        onValueChange = { viewModel?.onRegisterConfirmPasswordChange(it) },
                         label = "确认密码",
                         passwordVisible = passwordVisible,
-                        onPasswordVisibilityChange = { passwordVisible = !passwordVisible },
+                        onPasswordVisibilityChange = { viewModel?.onRegisterPasswordVisibilityChange(!passwordVisible) },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = Icons.Default.Lock,
                         isError = !passwordsMatch && confirmPassword.isNotBlank(),
@@ -727,27 +684,7 @@ object SettingScreen {
                     // 注册按钮
                     Button(
                         onClick = {
-                            when {
-                                username.isBlank() -> {
-                                    Toast.makeText(context, "请输入用户名", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                email.isBlank() -> {
-                                    Toast.makeText(context, "请输入邮箱地址", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                password.isBlank() -> {
-                                    Toast.makeText(context, "请输入密码", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                password != confirmPassword -> {
-                                    Toast.makeText(context, "两次输入的密码不一致", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                            }
-                            isLoading = true
                             onRegister(username, email, password)
-                            isLoading = false
                         },
                         enabled = !isLoading,
                         modifier = Modifier
@@ -755,7 +692,7 @@ object SettingScreen {
                             .height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppColors.Primary
-                    )
+                        )
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
@@ -807,84 +744,6 @@ object SettingScreen {
 
 
     /**
-     * 设备设置项组件
-     */
-    @Composable
-     fun DeviceSettingItem(
-        device: BluetoothDevice,
-        isConnected: Boolean,
-        onConnect: () -> Unit,
-        onDisconnect: () -> Unit
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isConnected) Color(0xFFE8F5E8) else Color.White
-            )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 设备图标和名称
-                Icon(
-                    painter = painterResource(R.drawable.bluetooth),
-                    contentDescription = "蓝牙设备",
-                    tint = if (isConnected) Color(0xFF4CAF50) else AppColors.Primary,
-                    modifier = Modifier.size(18.dp)
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = getDeviceDisplayName(device),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isConnected) Color(0xFF2E7D32) else AppColors.OnSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = device.address ?: "未知地址",
-                        fontSize = 10.sp,
-                        color = Color.Gray
-                    )
-                }
-
-                // 连接/断开按钮
-                Button(
-                    onClick = {
-                        if (isConnected) {
-                            onDisconnect()
-                        } else {
-                            onConnect()
-                        }
-                    },
-                    modifier = Modifier
-                        .height(32.dp)
-                        .width(if (isConnected) 70.dp else 60.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isConnected) Color(0xFFF44336) else AppColors.Primary
-                    ),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Text(
-                        text = if (isConnected) "断开" else "连接",
-                        fontSize = 12.sp,
-                        color = Color.White
-                    )
-                }
-            }
-        }
-    }
-
-    /**
      * 设备与偏好设置组合卡片
      * 将蓝牙设备管理、体重设置和压力提醒整合在一个卡片中
      */
@@ -901,20 +760,17 @@ object SettingScreen {
         onClearCache: () -> Unit,
         onBackupData: (Boolean, String, (Boolean) -> Unit) -> Unit,
         isLoggedIn: Boolean,
-        hasData: Boolean
+        hasData: Boolean,
+        settingViewModel: SettingViewModel? = null
     ) {
         // 使用rememberSaveable保存状态，避免配置变化后状态丢失
         var isDeviceListExpanded by rememberSaveable { mutableStateOf(false) }
-        var isEditingWeight by rememberSaveable { mutableStateOf(false) }
-        var weightInput by rememberSaveable { mutableStateOf("") }
-        var uploadStatus by remember { mutableStateOf("idle") }
 
-        // 优化图标旋转动画
-        val arrowRotation by animateFloatAsState(
-            targetValue = if (isDeviceListExpanded) 90f else 0f,
-            animationSpec = tween(durationMillis = AnimationDefaults.DURATION_LONG),
-            label = "arrow_rotation"
-        )
+        // 使用 SettingViewModel 管理状态
+        val isEditingWeight = settingViewModel?.isEditingWeight?.collectAsStateWithLifecycle()?.value ?: false
+        val weightInput = settingViewModel?.weightInput?.collectAsStateWithLifecycle()?.value ?: ""
+        val uploadStatus = settingViewModel?.uploadStatus?.collectAsStateWithLifecycle()?.value ?: UploadStatus.IDLE
+        val showClearCacheConfirm = settingViewModel?.showClearCacheConfirm?.collectAsStateWithLifecycle()?.value ?: false
 
         Card(
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -922,112 +778,37 @@ object SettingScreen {
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                // 1. 蓝牙设备管理（可展开）
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { isDeviceListExpanded = !isDeviceListExpanded },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.bluetooth),
-                        contentDescription = "蓝牙设备",
-                        tint = AppColors.Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "蓝牙设备管理",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
-                        )
-                        Text(
-                            if (connectedDevice != null) "已连接：${getDeviceDisplayName(connectedDevice)}"
-                            else "未连接设备",
-                            fontSize = 14.sp,
-                            color = if (connectedDevice != null) Color(0xFF4CAF50) else Color.Gray
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = if (isDeviceListExpanded) "收起" else "展开",
-                        tint = Color.Gray,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer {
-                                rotationZ = arrowRotation
-                            }
-                    )
-                }
+                // 1. 蓝牙设备管理（可展开）- 使用高性能动画
+                DeviceListHeader(
+                    isExpanded = isDeviceListExpanded,
+                    onExpandedChange = { isDeviceListExpanded = it },
+                    connectedDevice = connectedDevice
+                )
 
                 // 展开的设备列表
                 AnimatedVisibility(
                     visible = isDeviceListExpanded,
-                    enter = expandVertically(
-                        animationSpec = AnimationDefaults.expandTween
-                    ) + fadeIn(animationSpec = AnimationDefaults.fadeInTween),
-                    exit = shrinkVertically(
-                        animationSpec = AnimationDefaults.shrinkTween
-                    ) + fadeOut(animationSpec = AnimationDefaults.fadeOutTween)
+                    enter = expandVertically(animationSpec = AnimationDefaults.expandTween) +
+                            fadeIn(animationSpec = AnimationDefaults.fadeInTween),
+                    exit = shrinkVertically(animationSpec = AnimationDefaults.shrinkTween) +
+                           fadeOut(animationSpec = AnimationDefaults.fadeOutTween)
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(12.dp))
-
-                        if (scannedDevices.isEmpty()) {
-                            Text(
-                                "未找到设备，请在主页点击扫描",
-                                fontSize = 12.sp,
-                                color = Color.Gray,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
-                                textAlign = TextAlign.Center
-                            )
-                        } else {
-                            // 使用 LazyColumn 优化大量设备列表的性能
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                items(
-                                    items = scannedDevices,
-                                    key = { it.address ?: it.hashCode() }
-                                ) { device ->
-                                    DeviceSettingItem(
-                                        device = device,
-                                        isConnected = connectedDevice?.address == device.address,
-                                        onConnect = { onConnectDevice(device) },
-                                        onDisconnect = onDisconnectDevice
-                                    )
-                                }
-                            }
-                        }
-
-                        if (connectedDevice != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(Color.Green, CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    "已连接",
-                                    fontSize = 12.sp,
-                                    color = Color.Green,
-                                    fontWeight = FontWeight.Medium
+                        DeviceListContent(
+                            scannedDevices = scannedDevices,
+                            connectedDevice = connectedDevice,
+                            onConnectDevice = onConnectDevice,
+                            onDisconnectDevice = onDisconnectDevice,
+                            deviceSettingItem = { device, isConnected, onConnect, onDisconnect ->
+                                DeviceSettingItem(
+                                    device = device,
+                                    isConnected = isConnected,
+                                    onConnect = onConnect,
+                                    onDisconnect = onDisconnect
                                 )
                             }
-                        }
+                        )
                     }
                 }
 
@@ -1050,77 +831,77 @@ object SettingScreen {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.man),
-                            contentDescription = "体重",
-                            tint = AppColors.Primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column {
-                            Text(
-                                "体重数据",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = AppColors.OnSurface
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.man),
+                                contentDescription = "体重",
+                                tint = AppColors.Primary,
+                                modifier = Modifier.size(24.dp)
                             )
-                            Text(
-                                "输入体重数值",
-                                fontSize = 12.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 使用 BasicTextField 替代 OutlinedTextField，完全控制内边距
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = weightInput,
-                            onValueChange = { weightInput = it },
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                            ),
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(
-                                fontSize = 16.sp,
-                                color = AppColors.OnSurface
-                            ),
-                            modifier = Modifier
-                                .width(60.dp)
-                                .height(36.dp)
-                                .border(
-                                    width = 1.dp,
-                                    color = AppColors.Primary,
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    "体重数据",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = AppColors.OnSurface
                                 )
-                                .padding(horizontal = 8.dp, vertical = 8.dp)
-                        )
+                                Text(
+                                    "输入体重数值",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
 
-                        Text(
-                            text = " kg",
-                            fontSize = 14.sp,
-                            color = AppColors.OnSurface,
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 使用 BasicTextField 替代 OutlinedTextField，完全控制内边距
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = weightInput,
+                                onValueChange = { settingViewModel?.onWeightInputChange(it) },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                                ),
+                                singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    fontSize = 16.sp,
+                                    color = AppColors.OnSurface
+                                ),
+                                modifier = Modifier
+                                    .width(60.dp)
+                                    .height(36.dp)
+                                    .border(
+                                        width = 1.dp,
+                                        color = AppColors.Primary,
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                                            8.dp
+                                        )
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                            )
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = " kg",
+                                fontSize = 14.sp,
+                                color = AppColors.OnSurface,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             // 确认按钮
-                            val context = LocalContext.current
                             IconButton(
                                 onClick = {
-                                    val weight = weightInput.toFloatOrNull()
-                                    if (weight != null && weight > 0 && weight < 300) {
+                                    val weight = settingViewModel?.validateWeightInput()
+                                    if (weight != null) {
                                         onEditWeight(weight)
-                                        isEditingWeight = false
                                     } else {
-                                        Toast.makeText(context, "请输入有效的体重（1-300kg）", Toast.LENGTH_SHORT).show()
+                                        settingViewModel?.showError("请输入有效的体重值（1-300kg）")
                                     }
                                 },
                                 modifier = Modifier.size(32.dp)
@@ -1135,10 +916,7 @@ object SettingScreen {
 
                             // 取消按钮
                             IconButton(
-                                onClick = {
-                                    isEditingWeight = false
-                                    weightInput = ""
-                                },
+                                onClick = { settingViewModel?.cancelEditingWeight() },
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
@@ -1155,10 +933,7 @@ object SettingScreen {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                weightInput = if (userWeight > 0) userWeight.toString() else ""
-                                isEditingWeight = true
-                            }
+                            .clickable { settingViewModel?.startEditingWeight(userWeight) }
                             .height(48.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -1260,22 +1035,17 @@ object SettingScreen {
                 )
 
                 // 4. 数据备份
-                val context = LocalContext.current
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            when {
-                                !isLoggedIn -> {
-                                }
-                                !hasData -> {
-                                }
-                                uploadStatus == "uploading" -> {
-                                }
-                                else -> {
-                                    uploadStatus = "uploading"
-                                    onBackupData(true, "") { success ->
-                                        uploadStatus = if (success) "success" else "failed"
+                            if (settingViewModel?.canBackup(isLoggedIn, hasData) == true) {
+                                settingViewModel.startBackup()
+                                onBackupData(true, "") { success ->
+                                    if (success) {
+                                        settingViewModel.onBackupSuccess()
+                                    } else {
+                                        settingViewModel.onBackupFailed()
                                     }
                                 }
                             }
@@ -1307,15 +1077,15 @@ object SettingScreen {
                                 when {
                                     !isLoggedIn -> "请先登录后再备份"
                                     !hasData -> "暂无数据可备份"
-                                    uploadStatus == "uploading" -> "正在上传..."
-                                    uploadStatus == "success" -> "上传成功"
-                                    uploadStatus == "failed" -> "上传失败"
+                                    uploadStatus == UploadStatus.UPLOADING -> "正在上传..."
+                                    uploadStatus == UploadStatus.SUCCESS -> "上传成功"
+                                    uploadStatus == UploadStatus.FAILED -> "上传失败"
                                     else -> "备份到云端"
                                 },
                                 fontSize = 14.sp,
                                 color = when (uploadStatus) {
-                                    "success" -> Color(0xFF4CAF50)
-                                    "failed" -> Color(0xFFF44336)
+                                    UploadStatus.SUCCESS -> Color(0xFF4CAF50)
+                                    UploadStatus.FAILED -> Color(0xFFF44336)
                                     else -> Color.Gray
                                 }
                             )
@@ -1323,14 +1093,15 @@ object SettingScreen {
                     }
 
                     when (uploadStatus) {
-                        "uploading" -> {
+                        UploadStatus.UPLOADING -> {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
                                 color = AppColors.Primary,
                                 strokeWidth = 2.dp
                             )
                         }
-                        "success" -> {
+
+                        UploadStatus.SUCCESS -> {
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
@@ -1345,7 +1116,8 @@ object SettingScreen {
                                 )
                             }
                         }
-                        "failed" -> {
+
+                        UploadStatus.FAILED -> {
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
@@ -1360,6 +1132,7 @@ object SettingScreen {
                                 )
                             }
                         }
+
                         else -> {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -1374,9 +1147,8 @@ object SettingScreen {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // 5. 清除缓存按钮
-                var showClearCacheConfirm by remember { mutableStateOf(false) }
                 Button(
-                    onClick = { showClearCacheConfirm = true },
+                    onClick = { settingViewModel?.showClearCacheConfirmDialog() },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1394,7 +1166,7 @@ object SettingScreen {
                 // 清除缓存确认对话框
                 if (showClearCacheConfirm) {
                     AlertDialog(
-                        onDismissRequest = { showClearCacheConfirm = false },
+                        onDismissRequest = { settingViewModel?.hideClearCacheConfirmDialog() },
                         title = { Text("清除缓存确认") },
                         text = {
                             Text("确定要清除所有缓存数据吗？这将包括：\n• 用户数据\n• 蓝牙设备列表\n• 传感器数据\n• 体重数据\n• 连接状态\n• 临时文件\n\n此操作不可撤销。")
@@ -1403,7 +1175,7 @@ object SettingScreen {
                             TextButton(
                                 onClick = {
                                     onClearCache()
-                                    showClearCacheConfirm = false
+                                    settingViewModel?.hideClearCacheConfirmDialog()
                                 }
                             ) {
                                 Text("确认清除", color = Color(0xFFF44336))
@@ -1411,7 +1183,7 @@ object SettingScreen {
                         },
                         dismissButton = {
                             TextButton(
-                                onClick = { showClearCacheConfirm = false }
+                                onClick = { settingViewModel?.hideClearCacheConfirmDialog() }
                             ) {
                                 Text("取消")
                             }
@@ -1423,7 +1195,7 @@ object SettingScreen {
     }
 
     @Composable
-     fun AboutAppSection() {
+    fun AboutAppSection() {
         // 使用rememberSaveable保存展开状态，避免配置变化后状态丢失
         var isVersionExpanded by rememberSaveable { mutableStateOf(false) }
         var isHelpExpanded by rememberSaveable { mutableStateOf(false) }
@@ -1435,53 +1207,25 @@ object SettingScreen {
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                // 1. 版本信息（可展开）- 与设备与偏好卡片风格一致
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            if (!isVersionExpanded) {
-                                isHelpExpanded = false
-                                isPrivacyExpanded = false
-                            }
-                            isVersionExpanded = !isVersionExpanded
-                        },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Info,
-                        contentDescription = "版本信息",
-                        tint = AppColors.Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "版本信息",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
-                        )
-                        Text(
-                            "v1.0.0 (Build 2026)",
-                            fontSize = 14.sp,
-                            color = Color.Gray
+                // 1. 版本信息（可展开）
+                SettingItem(
+                    icon = AppIcons.Info,
+                    title = "版本信息",
+                    subtitle = "v1.0.0 (Build 2026)",
+                    onClick = {
+                        if (!isVersionExpanded) {
+                            isHelpExpanded = false
+                            isPrivacyExpanded = false
+                        }
+                        isVersionExpanded = !isVersionExpanded
+                    },
+                    trailingContent = {
+                        ExpandableArrowIcon(
+                            isExpanded = isVersionExpanded,
+                            useGraphicsLayer = true
                         )
                     }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = if (isVersionExpanded) "收起" else "展开",
-                        tint = Color.Gray,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer {
-                                rotationZ = if (isVersionExpanded) 90f else 0f
-                            }
-                    )
-                }
+                )
 
                 // 展开的版本详情
                 AnimatedVisibility(
@@ -1517,52 +1261,24 @@ object SettingScreen {
                 )
 
                 // 2. 使用帮助（可展开）
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            if (!isHelpExpanded) {
-                                isVersionExpanded = false
-                                isPrivacyExpanded = false
-                            }
-                            isHelpExpanded = !isHelpExpanded
-                        },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.help),
-                        contentDescription = "使用帮助",
-                        tint = AppColors.Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "使用帮助",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
-                        )
-                        Text(
-                            "操作指南与常见问题",
-                            fontSize = 14.sp,
-                            color = Color.Gray
+                SettingItem(
+                    icon = AppIcons.Help,
+                    title = "使用帮助",
+                    subtitle = "操作指南与常见问题",
+                    onClick = {
+                        if (!isHelpExpanded) {
+                            isVersionExpanded = false
+                            isPrivacyExpanded = false
+                        }
+                        isHelpExpanded = !isHelpExpanded
+                    },
+                    trailingContent = {
+                        ExpandableArrowIcon(
+                            isExpanded = isHelpExpanded,
+                            useGraphicsLayer = true
                         )
                     }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = if (isHelpExpanded) "收起" else "展开",
-                        tint = Color.Gray,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer {
-                                rotationZ = if (isHelpExpanded) 90f else 0f
-                            }
-                    )
-                }
+                )
 
                 // 展开的帮助内容
                 AnimatedVisibility(
@@ -1590,7 +1306,7 @@ object SettingScreen {
                             "1. 点击主页\"扫描\"按钮扫描设备\n" +
                                     "2. 选择要连接的蓝牙设备\n" +
                                     "3. 查看实时压力数据和图表\n" +
-                                    "4. 在设置中管理设备连接\n"+
+                                    "4. 在设置中管理设备连接\n" +
                                     "5. 登录账户后进行数据云端备份\n",
                             fontSize = 13.sp,
                             color = Color.DarkGray,
@@ -1608,52 +1324,24 @@ object SettingScreen {
                 )
 
                 // 3. 隐私政策（可展开）
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            if (!isPrivacyExpanded) {
-                                isVersionExpanded = false
-                                isHelpExpanded = false
-                            }
-                            isPrivacyExpanded = !isPrivacyExpanded
-                        },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.security),
-                        contentDescription = "隐私政策",
-                        tint = AppColors.Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "隐私政策",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
-                        )
-                        Text(
-                            "查看隐私保护条款",
-                            fontSize = 14.sp,
-                            color = Color.Gray
+                SettingItem(
+                    icon = AppIcons.Security,
+                    title = "隐私政策",
+                    subtitle = "查看隐私保护条款",
+                    onClick = {
+                        if (!isPrivacyExpanded) {
+                            isVersionExpanded = false
+                            isHelpExpanded = false
+                        }
+                        isPrivacyExpanded = !isPrivacyExpanded
+                    },
+                    trailingContent = {
+                        ExpandableArrowIcon(
+                            isExpanded = isPrivacyExpanded,
+                            useGraphicsLayer = true
                         )
                     }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = if (isPrivacyExpanded) "收起" else "展开",
-                        tint = Color.Gray,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer {
-                                rotationZ = if (isPrivacyExpanded) 90f else 0f
-                            }
-                    )
-                }
+                )
 
                 // 展开的隐私政策内容
                 AnimatedVisibility(
@@ -1693,36 +1381,13 @@ object SettingScreen {
         }
     }
 
-    /**
-     * 版本详情项组件
-     */
-    @Composable
-    private fun VersionDetailItem(label: String, value: String) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = label,
-                fontSize = 14.sp,
-                color = Color.Gray,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = value,
-                fontSize = 14.sp,
-                color = AppColors.OnSurface,
-                fontWeight = FontWeight.Normal
-            )
-        }
-    }
-
     @Composable
     private fun SettingItem(
         icon: AppIcon,
         title: String,
         subtitle: String,
-        onClick: () -> Unit
+        onClick: () -> Unit,
+        trailingContent: @Composable (() -> Unit)? = null
     ) {
         Card(
             modifier = Modifier
@@ -1777,7 +1442,8 @@ object SettingScreen {
                     )
                 }
 
-                Icon(
+                // 尾部内容：自定义或默认箭头
+                trailingContent?.invoke() ?: Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = "更多",
                     tint = Color.Gray
@@ -1810,8 +1476,21 @@ object SettingScreen {
         onBackupData: (Boolean, String, (Boolean) -> Unit) -> Unit,
         isLoggedIn: Boolean,
         hasData: Boolean,
-        onGenerateMockData: () -> Unit = {}
+        onGenerateMockData: () -> Unit = {},
+        settingViewModel: SettingViewModel? = null,
+        onShowError: ((String) -> Unit)? = null
     ) {
+        // 使用 SettingViewModel 管理状态
+        val showLoginDialog = settingViewModel?.showLoginDialog?.collectAsStateWithLifecycle()?.value ?: false
+        val showRegisterDialog = settingViewModel?.showRegisterDialog?.collectAsStateWithLifecycle()?.value ?: false
+        val errorMessage = settingViewModel?.errorMessage?.collectAsStateWithLifecycle()?.value
+
+        // 显示错误提示 - 通过回调让 Activity 处理
+        errorMessage?.let { message ->
+            onShowError?.invoke(message)
+            settingViewModel?.clearError()
+        }
+
         LazyColumn(
             modifier = modifier
                 .fillMaxSize()
@@ -1819,14 +1498,42 @@ object SettingScreen {
             contentPadding = PaddingValues(vertical = 16.dp, horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { 
+            item {
                 AccountSettingsSection(
                     userState = userState,
-                    onLogin = onLogin,
-                    onRegister = onRegister,
+                    onLogin = { email, password ->
+                        settingViewModel?.validateLoginForm()?.let { error ->
+                            settingViewModel.showError(error)
+                            return@AccountSettingsSection
+                        }
+                        settingViewModel?.setLoginLoading(true)
+                        onLogin(email, password)
+                        settingViewModel?.hideLoginDialog()
+                        settingViewModel?.setLoginLoading(false)
+                    },
+                    onRegister = { username, email, password ->
+                        settingViewModel?.validateRegisterForm()?.let { error ->
+                            settingViewModel.showError(error)
+                            return@AccountSettingsSection
+                        }
+                        settingViewModel?.setRegisterLoading(true)
+                        onRegister(username, email, password)
+                        settingViewModel?.hideRegisterDialog()
+                        settingViewModel?.setRegisterLoading(false)
+                    },
                     onLogout = onLogout,
-                    onEditProfile = onEditProfile
-                ) 
+                    onEditProfile = { username, email, password, currentPassword ->
+                        settingViewModel?.validateEditProfileForm()?.let { error ->
+                            settingViewModel.showError(error)
+                            return@AccountSettingsSection
+                        }
+                        settingViewModel?.setEditProfileLoading(true)
+                        onEditProfile(username, email, password, currentPassword)
+                        settingViewModel?.toggleEditProfileExpanded()
+                        settingViewModel?.setEditProfileLoading(false)
+                    },
+                    settingViewModel = settingViewModel
+                )
             }
             item {
                 // 设备与偏好设置组合卡片
@@ -1836,17 +1543,77 @@ object SettingScreen {
                     onConnectDevice = onConnectDevice,
                     onDisconnectDevice = onDisconnectDevice,
                     userWeight = userWeight,
-                    onEditWeight = onEditWeight,
+                    onEditWeight = { weight ->
+                        onEditWeight(weight)
+                        settingViewModel?.cancelEditingWeight()
+                    },
                     pressureAlertsEnabled = pressureAlertsEnabled,
                     onPressureAlertsChange = onPressureAlertsChange,
-                    onClearCache = onClearCache,
-                    onBackupData = onBackupData,
+                    onClearCache = {
+                        settingViewModel?.showClearCacheConfirmDialog()
+                    },
+                    onBackupData = { forceUpload, uploadType, onComplete ->
+                        settingViewModel?.let { viewModel ->
+                            if (viewModel.canBackup(isLoggedIn, hasData)) {
+                                viewModel.startBackup()
+                                onBackupData(forceUpload, uploadType) { success ->
+                                    if (success) {
+                                        viewModel.onBackupSuccess()
+                                    } else {
+                                        viewModel.onBackupFailed()
+                                    }
+                                    onComplete(success)
+                                }
+                            }
+                        }
+                    },
                     isLoggedIn = isLoggedIn,
-                    hasData = hasData
+                    hasData = hasData,
+                    settingViewModel = settingViewModel
                 )
             }
             item { AboutAppSection() }
+            item { DebugSection(onGenerateMockData = onGenerateMockData) }
+        }
+
+        // 登录对话框
+        if (showLoginDialog) {
+            LoginDialog(
+                onDismiss = { settingViewModel?.hideLoginDialog() },
+                onLogin = { email, password ->
+                    settingViewModel?.validateLoginForm()?.let { error ->
+                        settingViewModel.showError(error)
+                        return@LoginDialog
+                    }
+                    settingViewModel?.setLoginLoading(true)
+                    onLogin(email, password)
+                    settingViewModel?.hideLoginDialog()
+                    settingViewModel?.setLoginLoading(false)
+                },
+                onSwitchToRegister = { settingViewModel?.switchToRegister() },
+                viewModel = settingViewModel
+            )
+        }
+
+        // 注册对话框
+        if (showRegisterDialog) {
+            RegisterDialog(
+                onDismiss = { settingViewModel?.hideRegisterDialog() },
+                onRegister = { username, email, password ->
+                    settingViewModel?.validateRegisterForm()?.let { error ->
+                        settingViewModel.showError(error)
+                        return@RegisterDialog
+                    }
+                    settingViewModel?.setRegisterLoading(true)
+                    onRegister(username, email, password)
+                    settingViewModel?.hideRegisterDialog()
+                    settingViewModel?.setRegisterLoading(false)
+                },
+                onSwitchToLogin = { settingViewModel?.switchToLogin() },
+                viewModel = settingViewModel
+            )
         }
     }
-
 }
+
+

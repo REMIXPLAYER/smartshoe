@@ -42,6 +42,9 @@ class PerformanceMonitor @Inject constructor(
         private const val MAX_FPS_SAMPLES = 60 // 最大FPS样本数
         private const val MAX_MEMORY_SAMPLES = 30 // 最大内存样本数
         private const val MAX_CPU_SAMPLES = 20 // 最大CPU样本数
+
+        // 是否启用详细日志（DEBUG模式下可开启）
+        private const val ENABLE_VERBOSE_LOGS = false
     }
 
     // FPS监控
@@ -258,7 +261,9 @@ class PerformanceMonitor @Inject constructor(
                 isRunning = true
             )
 
-            Log.v(TAG, "FPS: $fps, Avg: ${String.format("%.1f", avgFps)}")
+            if (ENABLE_VERBOSE_LOGS) {
+                Log.v(TAG, "FPS: $fps, Avg: ${String.format("%.1f", avgFps)}")
+            }
         }
 
         lastFpsTime = currentTime
@@ -308,7 +313,9 @@ class PerformanceMonitor @Inject constructor(
                     memoryHistory.poll()
                 }
 
-                Log.v(TAG, "Memory - Heap: ${formatBytes(heapAlloc)}/${formatBytes(heapSize)}, PSS: ${formatBytes(totalPss)}")
+                if (ENABLE_VERBOSE_LOGS) {
+                    Log.v(TAG, "Memory - Heap: ${formatBytes(heapAlloc)}/${formatBytes(heapSize)}, PSS: ${formatBytes(totalPss)}")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error monitoring memory", e)
             }
@@ -359,7 +366,9 @@ class PerformanceMonitor @Inject constructor(
                         cpuHistory.poll()
                     }
 
-                    Log.v(TAG, "CPU - App: ${String.format("%.1f", appCpuUsage)}%, System: ${String.format("%.1f", systemCpuUsage)}%, Threads: $threadCount")
+                    if (ENABLE_VERBOSE_LOGS) {
+                        Log.v(TAG, "CPU - App: ${String.format("%.1f", appCpuUsage)}%, System: ${String.format("%.1f", systemCpuUsage)}%, Threads: $threadCount")
+                    }
                 }
 
                 lastCpuTime = currentCpuTime

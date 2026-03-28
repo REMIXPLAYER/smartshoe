@@ -1,7 +1,17 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.Smartshoe" parent="android:ThemeOverlay.Material.Dark.ActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+    <!-- 夜间模式主题，强制无ActionBar -->
+    <style name="Base.Theme.Smartshoe" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 禁用窗口标题 -->
+        <item name="android:windowNoTitle">true</item>
+        <!-- 禁用ActionBar -->
+        <item name="android:windowActionBar">false</item>
+        <!-- 深色模式适配 -->
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+    
+    <style name="Theme.Smartshoe" parent="Base.Theme.Smartshoe">
+        <!-- 透明状态栏 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

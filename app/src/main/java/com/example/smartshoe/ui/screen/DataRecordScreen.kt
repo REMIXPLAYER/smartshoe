@@ -1,4 +1,4 @@
-﻿﻿﻿package com.example.smartshoe.ui.screen
+package com.example.smartshoe.ui.screen
 
 import android.bluetooth.BluetoothDevice
 import androidx.compose.foundation.background
@@ -36,6 +36,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.data.model.SensorDataPoint
 import com.example.smartshoe.ui.component.chart.ChartConfigUtils
+import com.example.smartshoe.ui.component.getDeviceDisplayName
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener
 
@@ -181,8 +182,8 @@ object DataRecordScreen {
             }
         }
 
-        // 当数据更新且用户未交互时，自动更新选中值为最新值
-        LaunchedEffect(data.size) {
+        // 修复：使用 data 作为 key，确保数据变化时触发
+        LaunchedEffect(data) {
             if (!isUserInteracting && data.isNotEmpty()) {
                 selectedValue = sensorValueExtractor(data.last())
             }
@@ -395,15 +396,16 @@ object DataRecordScreen {
         sensorIndex: Int,
         sensorName: String
     ) {
-        // 使用derivedStateOf优化当前值计算，只在数据变化时重新计算
-        val currentValue by remember(data.size, sensorIndex) {
+        // 修复：使用 data 本身作为 remember 的 key，确保数据变化时重新计算
+        // 使用 derivedStateOf 优化，只在数据内容变化时重新计算
+        val currentValue by remember(data) {
             derivedStateOf {
                 data.lastOrNull()?.getValue(sensorIndex) ?: 0
             }
         }
 
-        // 缓存时间戳计算
-        val timestamps by remember(data.size) {
+        // 修复：同样使用 data 作为 key
+        val timestamps by remember(data) {
             derivedStateOf {
                 val first = data.firstOrNull()?.timestamp ?: 0L
                 val last = data.lastOrNull()?.timestamp ?: first
@@ -446,10 +448,9 @@ object DataRecordScreen {
                     .height(200.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // 使用remember缓存图表数据，避免不必要的update调用
-                val chartData by remember(data.size, sensorIndex) {
-                    derivedStateOf { data }
-                }
+                // 修复：使用 data 作为 key，确保图表数据实时更新
+                // 使用 remember 缓存，避免不必要的对象创建
+                val chartData = remember(data) { data }
 
                 AndroidView(
                     factory = { context ->
@@ -467,7 +468,7 @@ object DataRecordScreen {
                         }
                     },
                     update = { chart ->
-                        // 使用 ChartConfigUtils 更新图表数据
+                        // 修复：每次 update 都重新获取最新数据
                         if (chartData.isNotEmpty()) {
                             ChartConfigUtils.updateChartData(
                                 chart,

@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+// 导入深灰色常量，用于初始状态
+private val INITIAL_SENSOR_COLOR = ColorUtils.COLOR_ZERO
+
 /**
  * 传感器数据视图模型
  * 管理传感器数据相关的UI状态和逻辑
@@ -31,9 +34,9 @@ class SensorDataViewModel @Inject constructor(
     private val userPreferencesManager: UserPreferencesManager
 ) : ViewModel() {
 
-    // 传感器颜色状态
+    // 传感器颜色状态 - 使用深灰色作为初始状态
     private val _sensorColors = MutableStateFlow<List<Color>>(
-        listOf(Color.Gray, Color.Gray, Color.Gray)
+        listOf(INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR)
     )
     val sensorColors: StateFlow<List<Color>> = _sensorColors.asStateFlow()
 
@@ -66,8 +69,8 @@ class SensorDataViewModel @Inject constructor(
     fun processReceivedData(data: String, shouldRecord: Boolean = true) {
         val result = sensorDataRepository.processReceivedData(data, shouldRecord)
         result?.let { (values, extras) ->
-            // 更新 UI 状态
-            updateColors(values)
+            // 修复：颜色应该基于 extras（传感器数值）计算，而不是 values
+            updateColors(extras)
             updateExtraValues(extras)
             refreshHistoricalData()
 
@@ -119,7 +122,7 @@ class SensorDataViewModel @Inject constructor(
      * 重置传感器显示状态
      */
     fun resetSensorDisplayState() {
-        _sensorColors.value = listOf(Color.Gray, Color.Gray, Color.Gray)
+        _sensorColors.value = listOf(INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR)
         _extraValues.value = listOf(0, 0, 0)
     }
 

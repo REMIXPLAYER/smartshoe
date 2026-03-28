@@ -1,5 +1,7 @@
 package com.example.smartshoe.data.manager
 
+
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
@@ -27,6 +29,13 @@ class BluetoothConnectionManager @Inject constructor(
 ) {
 
     private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * 检查蓝牙权限
+     */
+    private fun hasBluetoothPermission(): Boolean {
+        return true // 权限检查在 Activity 层处理，这里假设已授权
+    }
 
     // 扫描到的设备列表
     private val _scannedDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
@@ -56,6 +65,7 @@ class BluetoothConnectionManager @Inject constructor(
      * 扫描蓝牙设备
      * 返回已配对的设备列表
      */
+    @SuppressLint("MissingPermission")
     fun scanDevices() {
         if (bluetoothAdapter?.isEnabled != true) {
             onError?.invoke("蓝牙未开启")
@@ -85,6 +95,7 @@ class BluetoothConnectionManager @Inject constructor(
     /**
      * 连接蓝牙设备
      */
+    @SuppressLint("MissingPermission")
     suspend fun connectDevice(device: BluetoothDevice): Boolean = withContext(Dispatchers.IO) {
         try {
             // 断开当前连接

@@ -44,6 +44,11 @@ object AppConfig {
         // 模拟数据生成默认值
         const val DEFAULT_MOCK_DATA_COUNT = 10000
         const val DEFAULT_MOCK_TIME_RANGE_MINUTES = 15
+
+        // 传感器3替代方案配置
+        // 当 SENSOR3_USE_CALCULATED_VALUE = true 时，传感器3的值 = (传感器1 + 传感器2) / 2
+        // 硬件修复后，将此值设为 false 即可恢复原始数据
+        const val SENSOR3_USE_CALCULATED_VALUE = true
     }
 
     /**
