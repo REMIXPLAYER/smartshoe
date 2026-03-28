@@ -21,7 +21,7 @@ import javax.inject.Singleton
  * 应用级依赖注入模块
  * 提供应用级别的单例依赖
  *
- * 注意：Manager 类（AuthManager, SensorDataManager 等）已经使用 @Singleton 和 @Inject 注解，
+ * 注意：Repository 类（AuthRepositoryImpl, SensorDataManager 等）已经使用 @Singleton 和 @Inject 注解，
  * Hilt 会自动处理它们的创建，不需要在此模块中提供。
  */
 @Module

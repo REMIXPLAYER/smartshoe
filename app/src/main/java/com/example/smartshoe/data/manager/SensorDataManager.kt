@@ -6,6 +6,7 @@ import com.example.smartshoe.data.local.LocalDataSource
 import com.example.smartshoe.data.model.SensorDataPoint
 import com.example.smartshoe.data.model.SensorDataRecord
 import com.example.smartshoe.data.remote.*
+import com.example.smartshoe.data.repository.AuthRepositoryImpl
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,20 +19,24 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 传感器数据管理器
- * 封装传感器数据的上传、查询、管理功能
- * 优化版本：支持批量上传、重试机制和进度监控
+ * 传感器数据仓库实现
  *
- * 重构：
- * 1. 使用 Hilt 注入替代单例模式
- * 2. 使用 AuthManager 获取 Token，避免重复存储
- * 3. 使用 LocalDataSource 统一管理本地存储
+ * 职责：协调远程数据源，提供传感器数据上传、查询、管理功能
+ * - 远程：SensorDataApiService (HTTP API)
+ * - 认证：AuthRepositoryImpl (获取Token)
+ *
+ * 功能：
+ * - 批量上传传感器数据（带重试机制）
+ * - 查询历史记录
+ * - 上传进度监控
+ *
+ * 注意：此类不处理业务逻辑，业务逻辑在 ViewModel 中处理
  */
 @Singleton
 class SensorDataManager @Inject constructor(
     private val localDataSource: LocalDataSource,
     private val apiService: SensorDataApiService,
-    private val authManager: AuthManager
+    private val authRepository: AuthRepositoryImpl
 ) {
 
     // 统一的协程作用域，使用 SupervisorJob 确保子协程错误不会影响其他协程
@@ -90,17 +95,17 @@ class SensorDataManager @Inject constructor(
 
     /**
      * 获取Token
-     * 从 AuthManager 获取，避免重复存储
+     * 从 AuthRepository 获取，避免重复存储
      */
     private fun getToken(): String? {
-        return authManager.getToken()
+        return authRepository.getToken()
     }
 
     /**
      * 检查是否已登录
      */
     fun isLoggedIn(): Boolean {
-        return authManager.isLoggedIn()
+        return authRepository.getCurrentUser() != null
     }
 
     /**
@@ -332,7 +337,7 @@ class SensorDataManager @Inject constructor(
                 e.cause is NetworkException.UnauthorizedException
             if (isUnauthorized) {
                 Log.w(TAG, "Token已过期，自动登出用户")
-                authManager.handleTokenExpired()
+                authRepository.logout()
                 return UploadResult.Error("登录已过期，请重新登录")
             }
 

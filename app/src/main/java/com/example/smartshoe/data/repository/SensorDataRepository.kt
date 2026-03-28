@@ -4,6 +4,8 @@ import android.util.Log
 import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.data.local.CircularBuffer
 import com.example.smartshoe.data.model.SensorDataPoint
+import com.example.smartshoe.util.ColorUtils
+import com.example.smartshoe.util.PressureStatus
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,6 +17,7 @@ import javax.inject.Singleton
  * - 传感器数据解析和存储
  * - 历史数据管理
  * - 备份数据管理
+ * - 滑动窗口加权平均计算
  *
  * 注意：不包含任何业务逻辑（如压力提醒），业务逻辑应在 ViewModel 中处理
  */
@@ -35,6 +38,22 @@ class SensorDataRepository @Inject constructor() {
     private var lastRecordTime = 0L
     private val recordingInterval = AppConfig.Sensor.RECORDING_INTERVAL_MS
 
+    // ========== 滑动窗口加权平均相关 ==========
+    // 三个传感器的滑动窗口数据
+    private val sensor1Window = ArrayDeque<Int>(ColorUtils.DEFAULT_WINDOW_SIZE)
+    private val sensor2Window = ArrayDeque<Int>(ColorUtils.DEFAULT_WINDOW_SIZE)
+    private val sensor3Window = ArrayDeque<Int>(ColorUtils.DEFAULT_WINDOW_SIZE)
+
+    // 当前加权平均值
+    private var sensor1WeightedAvg = 0f
+    private var sensor2WeightedAvg = 0f
+    private var sensor3WeightedAvg = 0f
+
+    // 当前压力状态
+    private var sensor1Status = PressureStatus.NONE
+    private var sensor2Status = PressureStatus.NONE
+    private var sensor3Status = PressureStatus.NONE
+
     /**
      * 处理接收到的蓝牙数据
      * @param data 接收到的字符串数据（格式：十六进制数值，用逗号分隔）
@@ -48,15 +67,18 @@ class SensorDataRepository @Inject constructor() {
                 val values = hexValues.take(3).map { it.toInt(16) }.toMutableList()
                 var extras = hexValues.takeLast(3).map { it.toInt(16) }.toMutableList()
 
-                // 传感器3替代方案：当硬件损坏时，使用传感器1和2的平均值
+                // 传感器3替代方案：传感器3 = 传感器2 * 9/7
                 if (AppConfig.Sensor.SENSOR3_USE_CALCULATED_VALUE) {
-                    val calculatedSensor3 = (extras[0] + extras[1]) / 2
+                    val calculatedSensor3 = (extras[1] * 9 / 7).coerceIn(0, AppConfig.Sensor.SENSOR_MAX_VALUE)
                     extras[2] = calculatedSensor3
                     // 同时更新 values 数组（如果蓝牙数据中的 values 也需要更新）
                     if (values.size >= 3) {
                         values[2] = calculatedSensor3
                     }
                 }
+
+                // 更新滑动窗口并计算加权平均
+                updateSlidingWindowAndCalculate(extras[0], extras[1], extras[2])
 
                 if (shouldRecord) {
                     autoRecordData(extras[0], extras[1], extras[2])
@@ -71,18 +93,79 @@ class SensorDataRepository @Inject constructor() {
     }
 
     /**
-     * 检查压力是否超过阈值
-     * @param extras 传感器数值列表
-     * @return 压力异常的传感器索引和数值列表，如果没有异常返回空列表
+     * 更新滑动窗口并计算加权平均值
+     *
+     * @param sensor1Value 传感器1数值
+     * @param sensor2Value 传感器2数值
+     * @param sensor3Value 传感器3数值
      */
-    fun checkPressureAlerts(extras: List<Int>): List<Pair<Int, Int>> {
-        val alerts = mutableListOf<Pair<Int, Int>>()
-        extras.forEachIndexed { index, value ->
-            if (value > AppConfig.Sensor.PRESSURE_ALERT_THRESHOLD) {
-                alerts.add(Pair(index, value))
-            }
+    private fun updateSlidingWindowAndCalculate(
+        sensor1Value: Int,
+        sensor2Value: Int,
+        sensor3Value: Int
+    ) {
+        // 更新传感器1窗口
+        sensor1Window.addLast(sensor1Value)
+        if (sensor1Window.size > ColorUtils.DEFAULT_WINDOW_SIZE) {
+            sensor1Window.removeFirst()
         }
-        return alerts
+
+        // 更新传感器2窗口
+        sensor2Window.addLast(sensor2Value)
+        if (sensor2Window.size > ColorUtils.DEFAULT_WINDOW_SIZE) {
+            sensor2Window.removeFirst()
+        }
+
+        // 更新传感器3窗口
+        sensor3Window.addLast(sensor3Value)
+        if (sensor3Window.size > ColorUtils.DEFAULT_WINDOW_SIZE) {
+            sensor3Window.removeFirst()
+        }
+
+        // 计算加权平均值
+        sensor1WeightedAvg = ColorUtils.calculateWeightedAverage(sensor1Window.toList())
+        sensor2WeightedAvg = ColorUtils.calculateWeightedAverage(sensor2Window.toList())
+        sensor3WeightedAvg = ColorUtils.calculateWeightedAverage(sensor3Window.toList())
+
+        // 更新压力状态
+        sensor1Status = ColorUtils.getPressureStatusFromAverage(sensor1WeightedAvg)
+        sensor2Status = ColorUtils.getPressureStatusFromAverage(sensor2WeightedAvg)
+        sensor3Status = ColorUtils.getPressureStatusFromAverage(sensor3WeightedAvg)
+
+        Log.d(TAG, "加权平均值 - S1: ${sensor1WeightedAvg.toInt()}, S2: ${sensor2WeightedAvg.toInt()}, S3: ${sensor3WeightedAvg.toInt()}")
+    }
+
+    /**
+     * 获取当前加权平均值列表
+     *
+     * @return 三个传感器的加权平均值列表
+     */
+    fun getWeightedAverages(): List<Float> {
+        return listOf(sensor1WeightedAvg, sensor2WeightedAvg, sensor3WeightedAvg)
+    }
+
+    /**
+     * 获取当前压力状态列表
+     *
+     * @return 三个传感器的压力状态列表
+     */
+    fun getPressureStatuses(): List<PressureStatus> {
+        return listOf(sensor1Status, sensor2Status, sensor3Status)
+    }
+
+    /**
+     * 清空滑动窗口数据
+     */
+    fun clearSlidingWindow() {
+        sensor1Window.clear()
+        sensor2Window.clear()
+        sensor3Window.clear()
+        sensor1WeightedAvg = 0f
+        sensor2WeightedAvg = 0f
+        sensor3WeightedAvg = 0f
+        sensor1Status = PressureStatus.NONE
+        sensor2Status = PressureStatus.NONE
+        sensor3Status = PressureStatus.NONE
     }
 
     /**
@@ -112,6 +195,7 @@ class SensorDataRepository @Inject constructor() {
         historicalDataBuffer.clear()
         backupDataBuffer.clear()
         lastRecordTime = 0L
+        clearSlidingWindow()
     }
 
     /**

@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
 
     // 通过Hilt注入管理器
     // 重构：移除不必要的Manager注入，通过ViewModel访问
-    // @Inject lateinit var authManager: AuthManager
+    // @Inject lateinit var authRepository: AuthRepository
     // @Inject lateinit var sensorDataManager: SensorDataManager
     // memoryLeakDetector已从Application获取，不再在这里注入
     // @Inject lateinit var memoryLeakDetector: MemoryLeakDetector
@@ -133,8 +133,8 @@ class MainActivity : ComponentActivity() {
         // 重构：通过 UserProfileViewModel 初始化，不再直接访问 LocalDataSource
         userProfileViewModel.initUserWeight()
 
-        // 初始化登录状态（AuthViewModel 会收集 AuthManager 的 StateFlow）
-        // 不需要手动调用，AuthManager 初始化时会自动加载状态
+        // 初始化登录状态（AuthViewModel 会收集 AuthRepository 的 StateFlow）
+        // 不需要手动调用，AuthRepository 初始化时会自动加载状态
 
         // 初始化压力提醒设置
         // 重构：通过 SensorDataViewModel 初始化，不再直接访问 LocalDataSource
@@ -153,6 +153,7 @@ class MainActivity : ComponentActivity() {
                 scannedDevices = bluetoothViewModel.scannedDevices.collectAsStateWithLifecycle().value,
                 sensorColors = sensorDataViewModel.sensorColors.collectAsStateWithLifecycle().value,
                 extraValues = sensorDataViewModel.extraValues.collectAsStateWithLifecycle().value,
+                pressureStatuses = sensorDataViewModel.pressureStatuses.collectAsStateWithLifecycle().value,
                 historicalData = sensorDataViewModel.historicalData.collectAsStateWithLifecycle().value,
                 connectedDevice = bluetoothViewModel.connectedDevice.collectAsStateWithLifecycle().value,
                 userWeight = userProfileViewModel.userWeight.collectAsStateWithLifecycle().value,

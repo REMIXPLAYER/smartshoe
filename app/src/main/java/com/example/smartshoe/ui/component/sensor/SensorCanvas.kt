@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartshoe.R
 import com.example.smartshoe.ui.theme.AppColors
+import com.example.smartshoe.util.ColorUtils
+import com.example.smartshoe.util.PressureStatus
 
 /**
  * 传感器画布组件
@@ -37,12 +39,14 @@ object SensorCanvas {
 
     /**
      * 鞋垫与传感器组合组件（带Card包装和数值展示）
+     * 更新：支持显示压力状态描述
      */
     @Composable
     fun InsoleWithSensors(
         modifier: Modifier = Modifier,
         sensorColors: List<Color>,
         sensorValues: List<Int> = emptyList(),
+        pressureStatuses: List<PressureStatus> = emptyList(),
         sensorPositions: List<SensorPosition> = SensorPosition.DEFAULT_POSITIONS,
         contentScale: ContentScale = ContentScale.Fit,
         cardElevation: androidx.compose.ui.unit.Dp = 4.dp,
@@ -99,8 +103,11 @@ object SensorCanvas {
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // 下层: 传感器数值展示
-                    SensorValuesRow(sensorValues = sensorValues)
+                    // 下层: 传感器数值展示（显示压力状态描述）
+                    SensorValuesRow(
+                        sensorValues = sensorValues,
+                        pressureStatuses = pressureStatuses
+                    )
                 }
             }
         }
@@ -108,9 +115,13 @@ object SensorCanvas {
 
     /**
      * 传感器数值展示行
+     * 更新：显示压力状态描述（正常/偏高/过高）替代单位
      */
     @Composable
-    private fun SensorValuesRow(sensorValues: List<Int>) {
+    private fun SensorValuesRow(
+        sensorValues: List<Int>,
+        pressureStatuses: List<PressureStatus> = emptyList()
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -139,10 +150,20 @@ object SensorCanvas {
 
                     Spacer(modifier = Modifier.height(2.dp))
 
+                    // 显示压力状态描述（替代原来的"单位"）
+                    val status = pressureStatuses.getOrNull(index) ?: PressureStatus.NONE
+                    val statusColor = when (status) {
+                        PressureStatus.NONE -> Color.LightGray
+                        PressureStatus.NORMAL -> ColorUtils.COLOR_NORMAL
+                        PressureStatus.HIGH -> ColorUtils.COLOR_HIGH
+                        PressureStatus.CRITICAL -> ColorUtils.COLOR_CRITICAL
+                    }
+
                     Text(
-                        "单位",
+                        status.description,
                         fontSize = 12.sp,
-                        color = Color.LightGray
+                        color = statusColor,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }

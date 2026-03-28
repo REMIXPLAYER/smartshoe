@@ -1,12 +1,9 @@
 package com.example.smartshoe.data.model
 
-import androidx.compose.runtime.Stable
-
 /**
  * 用户状态数据类
- * 使用@Stable注解表示该类是稳定的，帮助Compose优化重组
+ * 纯数据类，不包含UI框架依赖
  */
-@Stable
 data class UserState(
     val isLoggedIn: Boolean = false,
     val username: String = "",

@@ -9,6 +9,7 @@ import com.example.smartshoe.data.manager.UserPreferencesManager
 import com.example.smartshoe.data.model.SensorDataPoint
 import com.example.smartshoe.data.repository.SensorDataRepository
 import com.example.smartshoe.util.ColorUtils
+import com.example.smartshoe.util.PressureStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,15 +36,25 @@ class SensorDataViewModel @Inject constructor(
     private val userPreferencesManager: UserPreferencesManager
 ) : ViewModel() {
 
-    // 传感器颜色状态 - 使用深灰色作为初始状态
+    // 传感器颜色状态 - 基于瞬时数值渐变渲染（使用深灰色作为初始状态）
     private val _sensorColors = MutableStateFlow<List<Color>>(
         listOf(INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR)
     )
     val sensorColors: StateFlow<List<Color>> = _sensorColors.asStateFlow()
 
-    // 传感器数值
+    // 传感器数值（原始值）
     private val _extraValues = MutableStateFlow<List<Int>>(listOf(0, 0, 0))
     val extraValues: StateFlow<List<Int>> = _extraValues.asStateFlow()
+
+    // 加权平均值
+    private val _weightedAverages = MutableStateFlow<List<Float>>(listOf(0f, 0f, 0f))
+    val weightedAverages: StateFlow<List<Float>> = _weightedAverages.asStateFlow()
+
+    // 压力状态描述
+    private val _pressureStatuses = MutableStateFlow<List<PressureStatus>>(
+        listOf(PressureStatus.NONE, PressureStatus.NONE, PressureStatus.NONE)
+    )
+    val pressureStatuses: StateFlow<List<PressureStatus>> = _pressureStatuses.asStateFlow()
 
     // 历史数据
     private val _historicalData = MutableStateFlow<List<SensorDataPoint>>(emptyList())
@@ -66,43 +77,72 @@ class SensorDataViewModel @Inject constructor(
     /**
      * 处理接收到的蓝牙数据
      * 包含压力提醒检查，业务逻辑在 ViewModel 中处理
+     * 颜色渲染：基于瞬时数值（extras）使用渐变方式
+     * 压力提醒：基于加权平均值
      */
     fun processReceivedData(data: String, shouldRecord: Boolean = true) {
         val result = sensorDataRepository.processReceivedData(data, shouldRecord)
         result?.let { (values, extras) ->
-            // 修复：颜色应该基于 extras（传感器数值）计算，而不是 values
-            updateColors(extras)
+            // 更新原始数值
             updateExtraValues(extras)
             refreshHistoricalData()
 
-            // 检查压力提醒（业务逻辑在 ViewModel 中处理）
+            // 颜色渲染：基于瞬时数值（渐变方式）
+            updateColorsFromExtras(extras)
+
+            // 加权平均值和压力状态（用于显示和报警）
+            updateWeightedAverages()
+            updatePressureStatuses()
+
+            // 检查压力提醒（基于加权平均值）
             if (_pressureAlertsEnabled.value) {
-                checkAndTriggerPressureAlerts(extras)
+                checkAndTriggerPressureAlertsFromWeighted()
             }
         }
     }
 
     /**
-     * 检查并触发压力提醒
-     * 业务逻辑：将压力数值转换为用户友好的提醒消息
+     * 基于瞬时数值更新传感器颜色（渐变渲染）
      */
-    private fun checkAndTriggerPressureAlerts(extras: List<Int>) {
-        val alerts = sensorDataRepository.checkPressureAlerts(extras)
-        if (alerts.isNotEmpty()) {
+    private fun updateColorsFromExtras(extras: List<Int>) {
+        val colors = extras.map { ColorUtils.calculateColorFromPressure(it) }
+        _sensorColors.value = colors
+    }
+
+    /**
+     * 更新加权平均值
+     */
+    private fun updateWeightedAverages() {
+        _weightedAverages.value = sensorDataRepository.getWeightedAverages()
+    }
+
+    /**
+     * 更新压力状态
+     */
+    private fun updatePressureStatuses() {
+        _pressureStatuses.value = sensorDataRepository.getPressureStatuses()
+    }
+
+    /**
+     * 基于加权平均值检查并触发压力提醒
+     * 报警阈值：滑动窗口加权平均值 > 1350
+     */
+    private fun checkAndTriggerPressureAlertsFromWeighted() {
+        val weightedAvgs = sensorDataRepository.getWeightedAverages()
+
+        // 找到第一个超过报警阈值的传感器（加权平均值 > 1350）
+        val alertIndex = weightedAvgs.indexOfFirst { it > PRESSURE_ALERT_THRESHOLD }
+
+        if (alertIndex != -1) {
             val sensorNames = listOf("脚掌前部", "脚弓部", "脚跟部")
-            // 取第一个异常压力作为提醒消息
-            val (index, value) = alerts.first()
-            _alertMessage.value = "${sensorNames[index]} 检测到异常压力: ${value}"
+            _alertMessage.value = "${sensorNames[alertIndex]} 压力异常，请注意足部健康哦~"
             _showAlertDialog.value = true
         }
     }
 
-    /**
-     * 更新传感器颜色
-     */
-    private fun updateColors(values: List<Int>) {
-        val colors = values.map { ColorUtils.calculateColorFromPressure(it) }
-        _sensorColors.value = colors
+    companion object {
+        // 报警阈值：滑动窗口加权平均值超过此值触发报警
+        const val PRESSURE_ALERT_THRESHOLD = 1350f
     }
 
     /**
@@ -125,6 +165,8 @@ class SensorDataViewModel @Inject constructor(
     fun resetSensorDisplayState() {
         _sensorColors.value = listOf(INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR)
         _extraValues.value = listOf(0, 0, 0)
+        _weightedAverages.value = listOf(0f, 0f, 0f)
+        _pressureStatuses.value = listOf(PressureStatus.NONE, PressureStatus.NONE, PressureStatus.NONE)
     }
 
     /**
@@ -160,6 +202,7 @@ class SensorDataViewModel @Inject constructor(
 
     /**
      * 生成模拟数据
+     * 修复：使用加权平均值更新颜色和状态
      */
     fun generateMockData(count: Int = 10000, timeRangeMinutes: Int = 15) {
         viewModelScope.launch {
@@ -169,8 +212,13 @@ class SensorDataViewModel @Inject constructor(
             // 更新最新数据的颜色和数值
             val latestData = sensorDataRepository.getLatestData()
             if (latestData != null) {
-                updateColors(listOf(latestData.sensor1, latestData.sensor2, latestData.sensor3))
-                updateExtraValues(listOf(latestData.sensor1, latestData.sensor2, latestData.sensor3))
+                val extras = listOf(latestData.sensor1, latestData.sensor2, latestData.sensor3)
+                updateExtraValues(extras)
+                // 颜色渲染：基于瞬时数值（渐变方式）
+                updateColorsFromExtras(extras)
+                // 加权平均值和压力状态
+                updateWeightedAverages()
+                updatePressureStatuses()
             }
         }
     }

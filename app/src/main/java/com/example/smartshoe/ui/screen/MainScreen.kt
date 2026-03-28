@@ -50,6 +50,7 @@ data class MainScreenState(
     val scannedDevices: List<BluetoothDevice> = emptyList(),
     val sensorColors: List<Color> = emptyList(),
     val extraValues: List<Int> = emptyList(),
+    val pressureStatuses: List<com.example.smartshoe.util.PressureStatus> = emptyList(),
     val historicalData: List<SensorDataPoint> = emptyList(),
     val connectedDevice: BluetoothDevice? = null,
     val userWeight: Float = 0f,
@@ -180,6 +181,9 @@ private fun MainAppScreen(
     val stableExtraValues by remember(state.extraValues) {
         derivedStateOf { state.extraValues }
     }
+    val stablePressureStatuses by remember(state.pressureStatuses) {
+        derivedStateOf { state.pressureStatuses }
+    }
 
     Scaffold(
         topBar = {
@@ -201,6 +205,7 @@ private fun MainAppScreen(
                         scannedDevices = stableScannedDevices,
                         sensorColors = stableSensorColors,
                         extraValues = stableExtraValues,
+                        pressureStatuses = stablePressureStatuses,
                         onScanDevices = callbacks.onScanDevices,
                         onConnectDevice = callbacks.onConnectDevice,
                         onDisconnectDevice = callbacks.onDisconnectDevice,
@@ -299,6 +304,7 @@ private fun MainContent(
     scannedDevices: List<BluetoothDevice>,
     sensorColors: List<Color>,
     extraValues: List<Int>,
+    pressureStatuses: List<com.example.smartshoe.util.PressureStatus> = emptyList(),
     onScanDevices: () -> Unit,
     connectedDevice: BluetoothDevice?,
     onConnectDevice: (BluetoothDevice) -> Unit,
@@ -326,6 +332,7 @@ private fun MainContent(
             InsoleWithSensors(
                 sensorColors = sensorColors,
                 sensorValues = extraValues,
+                pressureStatuses = pressureStatuses,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
