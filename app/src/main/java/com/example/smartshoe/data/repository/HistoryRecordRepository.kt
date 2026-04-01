@@ -21,6 +21,10 @@ class HistoryRecordRepository @Inject constructor(
     private val historyPageSize = 20
     private val historyCache = PagedDataCache<SensorDataRecord>(pageSize = 20, maxCachedPages = 5)
 
+    // 当前缓存的查询参数（用于检测查询条件变化）
+    private var cachedStartDate: Date? = null
+    private var cachedEndDate: Date? = null
+
     // 回调接口
     interface HistoryRecordCallback {
         fun onRecordsLoaded(records: List<SensorDataRecord>, page: Int, hasMorePages: Boolean)
@@ -49,6 +53,16 @@ class HistoryRecordRepository @Inject constructor(
         startDate: Date? = null,
         endDate: Date? = null
     ) {
+        // 检查查询条件是否变化（日期范围变化时需要强制刷新）
+        if (hasQueryParamsChanged(startDate, endDate)) {
+            historyCache.clear()
+            cachedStartDate = startDate
+            cachedEndDate = endDate
+            // 日期变化时强制刷新，不使用任何缓存
+            forceRefreshHistoryRecords(startDate, endDate)
+            return
+        }
+
         // 检查缓存
         if (!append && historyCache.isPageCached(page)) {
             val cachedData = historyCache.getPage(page)
@@ -78,6 +92,41 @@ class HistoryRecordRepository @Inject constructor(
                 handleQueryResult(success, message, records, total, page, append)
             }
         }
+    }
+
+    /**
+     * 强制刷新历史记录（不使用缓存）
+     * 在查询参数变化时调用，确保获取最新数据
+     */
+    private fun forceRefreshHistoryRecords(startDate: Date?, endDate: Date?) {
+        callback?.onLoadingStateChanged(true)
+
+        if (startDate != null && endDate != null) {
+            sensorDataManager.getRecordsByTimeRange(
+                startTime = startDate.time,
+                endTime = endDate.time,
+                page = 0,
+                size = historyPageSize,
+                useCache = false  // 关键：不使用缓存
+            ) { success, message, records, total ->
+                handleQueryResult(success, message, records, total, page = 0, append = false)
+            }
+        } else {
+            sensorDataManager.getUserRecords(
+                page = 0,
+                size = historyPageSize,
+                useCache = false  // 关键：不使用缓存
+            ) { success, message, records, total ->
+                handleQueryResult(success, message, records, total, page = 0, append = false)
+            }
+        }
+    }
+
+    /**
+     * 检查查询参数是否变化
+     */
+    private fun hasQueryParamsChanged(startDate: Date?, endDate: Date?): Boolean {
+        return startDate?.time != cachedStartDate?.time || endDate?.time != cachedEndDate?.time
     }
 
     /**
@@ -158,6 +207,8 @@ class HistoryRecordRepository @Inject constructor(
      */
     fun clearCache() {
         historyCache.clear()
+        cachedStartDate = null
+        cachedEndDate = null
     }
 
     /**

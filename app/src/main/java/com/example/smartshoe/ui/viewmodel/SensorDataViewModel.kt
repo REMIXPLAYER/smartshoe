@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.data.manager.SensorDataManager
 import com.example.smartshoe.data.manager.UserPreferencesManager
 import com.example.smartshoe.data.model.SensorDataPoint

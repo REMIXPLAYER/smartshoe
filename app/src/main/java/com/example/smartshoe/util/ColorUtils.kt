@@ -1,6 +1,8 @@
 package com.example.smartshoe.util
 
+import androidx.compose.ui.graphics.Color
 import com.example.smartshoe.config.AppConfig
+import kotlin.math.pow
 
 /**
  * 颜色工具类

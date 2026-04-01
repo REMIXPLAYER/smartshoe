@@ -268,6 +268,8 @@ class SensorDataRepository @Inject constructor() {
         dataPoints.sortedBy { it.timestamp }.forEach { point ->
             historicalDataBuffer.add(point)
             backupDataBuffer.add(point)
+            // 关键修复：同时更新滑动窗口和加权平均值
+            updateSlidingWindowAndCalculate(point.sensor1, point.sensor2, point.sensor3)
         }
 
         return dataPoints
