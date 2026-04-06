@@ -61,6 +61,7 @@ object HistoryScreen {
         Box(
             modifier = modifier
                 .fillMaxSize()
+                .background(AppColors.Background)
                 .padding(16.dp)
         ) {
             // 主内容区域（时间选择器和记录列表）- 始终显示在底层
@@ -115,7 +116,7 @@ object HistoryScreen {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(AppColors.Surface),
+                                .background(AppColors.Background),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(color = AppColors.Primary)

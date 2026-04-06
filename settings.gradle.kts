@@ -1,10 +1,10 @@
 pluginManagement {
     repositories {
-        maven { url = uri("https://maven.aliyun.com/repository/releases") }
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        gradlePluginPortal()
         google()
         mavenCentral()
-        gradlePluginPortal()
+        maven { url = uri("https://maven.aliyun.com/repository/releases") }
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
     }
 }
 dependencyResolutionManagement {

@@ -231,6 +231,10 @@ class SettingViewModel @Inject constructor(
         }
     }
 
+    fun showEditProfileDialog() {
+        _isEditProfileExpanded.value = true
+    }
+
     fun initEditProfileForm(userState: UserState) {
         _editProfileUsername.value = userState.username
         _editProfileEmail.value = userState.email
@@ -270,7 +274,6 @@ class SettingViewModel @Inject constructor(
 
         return when {
             _editProfileUsername.value.isBlank() -> "用户名不能为空"
-            _editProfileEmail.value.isBlank() -> "邮箱不能为空"
             _editProfileCurrentPassword.value.isBlank() -> "请输入当前密码进行身份验证"
             !passwordsMatch -> "新密码不匹配"
             else -> null
@@ -284,7 +287,6 @@ class SettingViewModel @Inject constructor(
         val passwordsMatch = _editProfileNewPassword.value == _editProfileConfirmPassword.value ||
                 _editProfileNewPassword.value.isEmpty()
         return _editProfileUsername.value.isNotBlank() &&
-                _editProfileEmail.value.isNotBlank() &&
                 _editProfileCurrentPassword.value.isNotBlank() &&
                 passwordsMatch
     }
