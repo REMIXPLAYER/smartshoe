@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -114,10 +115,35 @@ object BottomNavigation {
                 )
             )
 
-            // 设置标签
+            // AI助手标签
             NavigationBarItem(
                 selected = selectedTab == 3,
                 onClick = { onTabSelected(3) },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.SmartToy,
+                        contentDescription = "AI助手"
+                    )
+                },
+                label = {
+                    Text(
+                        "AI助手",
+                        fontSize = 12.sp
+                    )
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.White,
+                    selectedTextColor = Color(0xFF666666),
+                    unselectedIconColor = Color(0xFF666666),
+                    unselectedTextColor = Color(0xFF666666),
+                    indicatorColor = Color(0xFF3949AB)
+                )
+            )
+
+            // 设置标签
+            NavigationBarItem(
+                selected = selectedTab == 4,
+                onClick = { onTabSelected(4) },
                 icon = {
                     Icon(
                         imageVector = Icons.Filled.Settings,

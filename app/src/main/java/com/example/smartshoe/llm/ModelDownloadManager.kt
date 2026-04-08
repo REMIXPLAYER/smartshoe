@@ -51,14 +51,14 @@ class ModelDownloadManager @Inject constructor(
     )
 
     companion object {
-        // 阿里云 OSS 配置 - 请替换为实际的 OSS 地址
+        // Hugging Face 直链 - Qwen2.5-0.5B-Instruct Q4_K_M 量化模型
         val DEFAULT_MODEL = ModelInfo(
-            name = "Qwen-0.5B-Instruct",
-            url = "https://your-bucket.oss-cn-beijing.aliyuncs.com/models/qwen-0.5b-instruct-q4_k_m.gguf",
-            fileName = "qwen-0.5b-instruct-q4_k_m.gguf",
-            expectedSize = 352_321_632,
-            expectedHash = "a1b2c3d4e5f6789",
-            description = "通义千问 0.5B 量化模型"
+            name = "Qwen2.5-0.5B-Instruct",
+            url = "https://huggingface.co/SecondState/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+            fileName = "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+            expectedSize = 386_000_000,  // 约 368MB
+            expectedHash = "",
+            description = "通义千问 2.5 0.5B Q4_K_M 量化模型"
         )
 
         const val BUFFER_SIZE = 8192

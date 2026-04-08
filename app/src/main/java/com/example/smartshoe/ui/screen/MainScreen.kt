@@ -31,6 +31,7 @@ import com.example.smartshoe.ui.component.BottomNavigation.BottomNavigationBar
 import com.example.smartshoe.ui.component.ExpandableArrowIcon
 import com.example.smartshoe.ui.component.getDeviceDisplayName
 import com.example.smartshoe.ui.component.sensor.SensorCanvas.InsoleWithSensors
+import com.example.smartshoe.ui.screen.AIAssistantScreen.AIAssistantScreen
 import com.example.smartshoe.ui.screen.DataRecordScreen.DataRecordScreen
 import com.example.smartshoe.ui.screen.SettingScreen.SettingsScreen
 import com.example.smartshoe.ui.theme.AppColors
@@ -241,7 +242,11 @@ private fun MainAppScreen(
                     )
                 }
 
-                3 -> { // 设置页面
+                3 -> { // AI助手页面
+                    AIAssistantScreen()
+                }
+
+                4 -> { // 设置页面
                     Log.d("BackupDebug", "MainScreen: 传递 onBackupData=${callbacks.onBackupData}")
                     SettingsScreen(
                         modifier = Modifier.padding(innerPadding),
