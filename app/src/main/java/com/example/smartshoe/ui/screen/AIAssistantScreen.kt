@@ -11,7 +11,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,6 +70,7 @@ fun AIAssistantScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         // 状态栏
@@ -79,15 +79,16 @@ fun AIAssistantScreen(
             onDownloadClick = { viewModel.downloadModel() }
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // 消息列表
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
             state = listState,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(messages) { message ->
                 MessageBubble(message)
@@ -98,7 +99,7 @@ fun AIAssistantScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // 输入框
         ChatInput(
@@ -165,7 +166,7 @@ private fun ModelStatusBar(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Download,
+                            painter = painterResource(R.drawable.download),
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )
@@ -339,7 +340,7 @@ fun ModelDownloadDialog(
 
                     is ModelDownloadManager.DownloadState.Error -> {
                         Icon(
-                            painter = painterResource(R.drawable.ic_error),
+                            painter = painterResource(R.drawable.error),
                             contentDescription = null,
                             tint = AppColors.Error,
                             modifier = Modifier.size(48.dp)

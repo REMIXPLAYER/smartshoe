@@ -31,7 +31,7 @@ import com.example.smartshoe.ui.component.BottomNavigation.BottomNavigationBar
 import com.example.smartshoe.ui.component.ExpandableArrowIcon
 import com.example.smartshoe.ui.component.getDeviceDisplayName
 import com.example.smartshoe.ui.component.sensor.SensorCanvas.InsoleWithSensors
-import com.example.smartshoe.ui.screen.AIAssistantScreen.AIAssistantScreen
+import com.example.smartshoe.ui.screen.AIAssistantScreen
 import com.example.smartshoe.ui.screen.DataRecordScreen.DataRecordScreen
 import com.example.smartshoe.ui.screen.SettingScreen.SettingsScreen
 import com.example.smartshoe.ui.theme.AppColors

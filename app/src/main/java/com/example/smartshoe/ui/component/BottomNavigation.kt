@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -121,7 +121,7 @@ object BottomNavigation {
                 onClick = { onTabSelected(3) },
                 icon = {
                     Icon(
-                        imageVector = Icons.Filled.SmartToy,
+                        imageVector = Icons.Filled.Person,
                         contentDescription = "AI助手"
                     )
                 },
