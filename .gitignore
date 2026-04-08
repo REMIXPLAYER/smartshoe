@@ -103,3 +103,30 @@ fastlane/readme.md
 # JetBrains
 *.swp
 *~
+
+# LLM Model files
+*.gguf
+app/src/main/assets/models/
+
+# llama.cpp build directory
+app/src/main/cpp/llama.cpp/build/
+
+# Environment variables
+.env
+.env.local
+
+# IDE configurations
+.vscode/
+.vs/
+*.sublime-project
+*.sublime-workspace
+
+# Merge conflicts
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+
+# Crash logs
+crash-logs/

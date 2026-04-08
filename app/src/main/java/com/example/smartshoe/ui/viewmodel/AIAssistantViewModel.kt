@@ -57,15 +57,28 @@ class AIAssistantViewModel @Inject constructor(
             is LLMManager.ModelState.NotDownloaded -> {
                 llmManager.downloadAndLoadModel()
             }
-            is LLMManager.ModelState.Downloaded -> {
+            is LLMManager.ModelState.Downloaded,
+            is LLMManager.ModelState.Error -> {
+                // 已下载或加载失败时，重新尝试加载
                 llmManager.loadDownloadedModel()
             }
             else -> {}
         }
     }
 
+    fun deleteModel() {
+        llmManager.deleteModel()
+    }
+
     fun cancelDownload() {
         llmManager.cancelDownload()
+    }
+
+    fun clearError() {
+        // 清除错误状态，重置下载状态
+        viewModelScope.launch {
+            llmManager.checkModelStatus()
+        }
     }
 
     override fun onCleared() {

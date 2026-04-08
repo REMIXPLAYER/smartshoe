@@ -55,9 +55,10 @@ fun AIAssistantScreen(
     // 下载对话框
     val showDownloadDialog = downloadState is ModelDownloadManager.DownloadState.Downloading ||
             downloadState is ModelDownloadManager.DownloadState.Checking ||
-            downloadState is ModelDownloadManager.DownloadState.Verifying ||
-            (downloadState is ModelDownloadManager.DownloadState.Error &&
-                    modelState is LLMManager.ModelState.Downloading)
+            downloadState is ModelDownloadManager.DownloadState.Verifying
+
+    // 错误对话框（加载失败时显示）
+    val showErrorDialog = downloadState is ModelDownloadManager.DownloadState.Error
 
     if (showDownloadDialog) {
         ModelDownloadDialog(
@@ -65,6 +66,29 @@ fun AIAssistantScreen(
             onDismiss = { /* 下载中禁止关闭 */ },
             onRetry = { viewModel.downloadModel() },
             onCancel = { viewModel.cancelDownload() }
+        )
+    }
+
+    // 错误对话框
+    if (showErrorDialog) {
+        val errorState = downloadState as? ModelDownloadManager.DownloadState.Error
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            title = { Text("加载失败") },
+            text = { Text(errorState?.message ?: "未知错误") },
+            confirmButton = {
+                Button(onClick = { viewModel.clearError() }) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.clearError()
+                    viewModel.deleteModel()
+                }) {
+                    Text("删除模型")
+                }
+            }
         )
     }
 
@@ -77,7 +101,8 @@ fun AIAssistantScreen(
         // 状态栏
         ModelStatusBar(
             state = modelState,
-            onDownloadClick = { viewModel.downloadModel() }
+            onDownloadClick = { viewModel.downloadModel() },
+            onDeleteClick = { viewModel.deleteModel() }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -121,7 +146,8 @@ fun AIAssistantScreen(
 @Composable
 private fun ModelStatusBar(
     state: LLMManager.ModelState,
-    onDownloadClick: () -> Unit
+    onDownloadClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     Surface(
         color = when (state) {
@@ -177,11 +203,40 @@ private fun ModelStatusBar(
                 }
 
                 is LLMManager.ModelState.Downloaded -> {
-                    Button(
-                        onClick = onDownloadClick,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("加载模型", style = MaterialTheme.typography.labelSmall)
+                        Button(
+                            onClick = onDownloadClick,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("加载模型", style = MaterialTheme.typography.labelSmall)
+                        }
+                        OutlinedButton(
+                            onClick = onDeleteClick,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("删除", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                is LLMManager.ModelState.Error -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onDownloadClick,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("重试加载", style = MaterialTheme.typography.labelSmall)
+                        }
+                        OutlinedButton(
+                            onClick = onDeleteClick,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("删除", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
 

@@ -35,6 +35,24 @@ if(EXISTS ${LLAMA_CPP_DIR}/CMakeLists.txt)
     set(LLAMA_BUILD_NUMBER 0 CACHE STRING "Build number" FORCE)
     set(LLAMA_BUILD_COMMIT "unknown" CACHE STRING "Build commit" FORCE)
     
+    # 禁用 GPU 加速后端（Android 上 llama.cpp 的 GPU 支持不成熟）
+    # 原因：
+    # - Vulkan 需要主机 ninja 编译 shader，在 Android 交叉编译中失败
+    # - OpenCL 需要设备驱动支持，兼容性差
+    # - 目前最稳定的是 CPU + ARM NEON 优化
+    
+    # 显式禁用所有 GPU 后端
+    set(GGML_VULKAN OFF CACHE BOOL "Vulkan backend" FORCE)
+    set(GGML_OPENCL OFF CACHE BOOL "OpenCL backend" FORCE)
+    set(GGML_METAL OFF CACHE BOOL "Metal backend" FORCE)
+    set(GGML_CUDA OFF CACHE BOOL "CUDA backend" FORCE)
+    set(GGML_HIPBLAS OFF CACHE BOOL "HIPBLAS backend" FORCE)
+    
+    # 启用 ARM 优化（这是 Android 上最可靠的加速方式）
+    set(GGML_LLAMAFILE ON CACHE BOOL "LLAMAFILE optimizations" FORCE)
+    
+    message(STATUS "GPU backends disabled, using CPU with ARM optimizations")
+    
     add_subdirectory(${LLAMA_CPP_DIR} llama.cpp)
 else()
     message(WARNING "llama.cpp not found at ${LLAMA_CPP_DIR}. Please add it as a submodule.")

@@ -32,6 +32,9 @@ android {
                 arguments += "-DLLAMA_BUILD_COMMON=ON"
                 arguments += "-DLLAMA_METAL=OFF"
                 arguments += "-DLLAMA_ACCELERATE=OFF"
+                // 16KB 页大小对齐（Android 15+ 要求）
+                arguments += "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
+                arguments += "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
             }
         }
 

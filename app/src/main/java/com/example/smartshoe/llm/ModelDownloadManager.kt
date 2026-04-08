@@ -51,14 +51,25 @@ class ModelDownloadManager @Inject constructor(
     )
 
     companion object {
-        // 魔搭社区 ModelScope - Qwen2.5-0.5B-Instruct Q4_K_M 量化模型（国内速度快）
+        // 魔搭社区 ModelScope - Qwen2.5-0.5B-Instruct Q4_0 量化模型（更小更快）
+        // 正确的 ModelScope 下载链接格式
         val DEFAULT_MODEL = ModelInfo(
             name = "Qwen2.5-0.5B-Instruct",
-            url = "https://modelscope.cn/models/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/master/qwen2.5-0.5b-instruct-q4_k_m.gguf",
-            fileName = "qwen2.5-0.5b-instruct-q4_k_m.gguf",
-            expectedSize = 386_000_000,  // 约 368MB
+            url = "https://www.modelscope.cn/models/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/master/qwen2.5-0.5b-instruct-q4_0.gguf",
+            fileName = "qwen2.5-0.5b-instruct-q4_0.gguf",
+            expectedSize = 449_000_000,  // 实际 428.73MB
             expectedHash = "",
-            description = "通义千问 2.5 0.5B Q4_K_M 量化模型"
+            description = "通义千问 2.5 0.5B Q4_0 量化模型（轻量版）"
+        )
+
+        // HuggingFace 备用地址（国际访问）
+        val HF_MODEL = ModelInfo(
+            name = "Qwen2.5-0.5B-Instruct",
+            url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_0.gguf",
+            fileName = "qwen2.5-0.5b-instruct-q4_0.gguf",
+            expectedSize = 449_000_000,  // 实际 428.73MB
+            expectedHash = "",
+            description = "通义千问 2.5 0.5B Q4_0 量化模型 (HF轻量版)"
         )
 
         const val BUFFER_SIZE = 8192
@@ -107,8 +118,17 @@ class ModelDownloadManager @Inject constructor(
     suspend fun isModelReady(model: ModelInfo = DEFAULT_MODEL): Boolean =
         withContext(Dispatchers.IO) {
             val modelFile = getModelFile(model.fileName)
-            if (!modelFile.exists()) return@withContext false
-            if (modelFile.length() != model.expectedSize) return@withContext false
+            android.util.Log.d("ModelDownloadManager", "isModelReady: path=${modelFile.absolutePath}, exists=${modelFile.exists()}, size=${modelFile.length()}")
+            if (!modelFile.exists()) {
+                android.util.Log.d("ModelDownloadManager", "isModelReady: file does not exist")
+                return@withContext false
+            }
+            // 只检查文件是否存在且不为空（不检查精确大小，因为不同来源模型大小可能不同）
+            if (modelFile.length() < 1024 * 1024) {
+                android.util.Log.d("ModelDownloadManager", "isModelReady: file too small (${modelFile.length()} bytes)")
+                return@withContext false
+            }
+            android.util.Log.d("ModelDownloadManager", "isModelReady: file is ready")
             true
         }
 
@@ -207,9 +227,10 @@ class ModelDownloadManager @Inject constructor(
             return@flow
         }
 
-        // 重试机制
+        // 重试机制 - 先尝试主 URL，失败后备用 HF
         var retryCount = 0
         var lastError: Exception? = null
+        var useBackupUrl = false
 
         while (retryCount < MAX_RETRY_COUNT) {
             if (isCancelled.get()) {
@@ -218,7 +239,16 @@ class ModelDownloadManager @Inject constructor(
             }
 
             try {
-                performDownloadWithProgress(model, tempFile, modelFile).collect { state ->
+                // 如果主 URL 失败 2 次，切换到备用 URL
+                val currentModel = if (retryCount >= 2 && !useBackupUrl) {
+                    useBackupUrl = true
+                    emit(DownloadState.Checking("主站连接失败，切换到备用源..."))
+                    HF_MODEL
+                } else {
+                    model
+                }
+
+                performDownloadWithProgress(currentModel, tempFile, modelFile).collect { state ->
                     emit(state)
                 }
 
@@ -241,7 +271,7 @@ class ModelDownloadManager @Inject constructor(
 
         emit(
             DownloadState.Error(
-                lastError?.message ?: "下载失败，请重试",
+                lastError?.message ?: "下载失败，请检查网络连接",
                 retryable = true
             )
         )
@@ -325,17 +355,38 @@ class ModelDownloadManager @Inject constructor(
 
             // 验证文件
             emit(DownloadState.Verifying)
+            android.util.Log.d("ModelDownloadManager", "Verifying download: tempFile=${tempFile.absolutePath}, size=${tempFile.length()}")
 
-            if (tempFile.length() != model.expectedSize) {
+            // 检查文件是否为空（基本验证）
+            if (tempFile.length() < 1024 * 1024) {  // 小于 1MB 认为下载失败
+                android.util.Log.e("ModelDownloadManager", "Downloaded file too small: ${tempFile.length()} bytes")
                 tempFile.delete()
-                emit(DownloadState.Error("文件大小不匹配"))
+                emit(DownloadState.Error("文件大小异常，可能下载失败"))
                 return@flow
             }
 
-            // 清理旧模型文件（避免重复占用空间）
+            // 先重命名临时文件到最终文件（在清理之前！）
+            android.util.Log.d("ModelDownloadManager", "Renaming ${tempFile.absolutePath} to ${modelFile.absolutePath}")
+            val renameSuccess = tempFile.renameTo(modelFile)
+            if (!renameSuccess) {
+                android.util.Log.e("ModelDownloadManager", "Failed to rename temp file to model file")
+                // 尝试复制然后删除
+                try {
+                    tempFile.copyTo(modelFile, overwrite = true)
+                    tempFile.delete()
+                    android.util.Log.d("ModelDownloadManager", "Copied temp file to model file instead")
+                } catch (e: Exception) {
+                    android.util.Log.e("ModelDownloadManager", "Failed to copy file: ${e.message}")
+                    emit(DownloadState.Error("文件保存失败: ${e.message}"))
+                    return@flow
+                }
+            }
+            
+            // 清理旧模型文件（在重命名之后清理，避免删除临时文件）
+            android.util.Log.d("ModelDownloadManager", "Cleaning up old models, keeping: ${model.fileName}")
             cleanupOldModels(model.fileName)
-
-            tempFile.renameTo(modelFile)
+            
+            android.util.Log.d("ModelDownloadManager", "Download complete: ${modelFile.absolutePath}, exists=${modelFile.exists()}, size=${modelFile.length()}")
             emit(DownloadState.Success(modelFile))
         }
     }
