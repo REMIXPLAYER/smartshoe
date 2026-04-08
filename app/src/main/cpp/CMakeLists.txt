@@ -9,14 +9,22 @@ set(LLAMA_CPP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
 
 # 检查 llama.cpp 是否存在
 if(EXISTS ${LLAMA_CPP_DIR}/CMakeLists.txt)
-    # 关键：启用 common 库构建（必须在 add_subdirectory 之前）
+    # 关键：禁用 macOS 特定的工具链检测
+    set(CMAKE_SYSTEM_NAME Android)
+    
+    # 禁用 llama.cpp 中不需要的功能
     set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
     set(LLAMA_STANDALONE OFF CACHE BOOL "Standalone build" FORCE)
-    
-    # 禁用不需要的组件以加快构建
     set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
     set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Build examples" FORCE)
     set(LLAMA_BUILD_SERVER OFF CACHE BOOL "Build server" FORCE)
+    
+    # 禁用 HTTPS/SSL 支持（避免 OpenSSL 依赖）
+    set(LLAMA_CURL OFF CACHE BOOL "Use libcurl" FORCE)
+    
+    # 禁用 Git 版本检测
+    set(LLAMA_BUILD_NUMBER 0 CACHE STRING "Build number" FORCE)
+    set(LLAMA_BUILD_COMMIT "unknown" CACHE STRING "Build commit" FORCE)
     
     add_subdirectory(${LLAMA_CPP_DIR} llama.cpp)
 else()
