@@ -38,8 +38,7 @@ android {
         // 启用 16KB 页大小支持
         ndk {
             abiFilters += listOf("arm64-v8a")
-            // 设置 16KB 对齐
-            stl = "c++_shared"
+            // 注意：stl 已在 CMakeLists.txt 中通过 ANDROID_STL 指定
         }
     }
 
