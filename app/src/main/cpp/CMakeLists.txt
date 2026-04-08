@@ -95,3 +95,7 @@ endif()
 
 # 链接时优化
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+
+# 16KB 页大小对齐（Android 15+ 要求）
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,max-page-size=16384")

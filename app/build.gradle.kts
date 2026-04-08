@@ -34,6 +34,22 @@ android {
                 arguments += "-DLLAMA_ACCELERATE=OFF"
             }
         }
+
+        // 启用 16KB 页大小支持
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+            // 设置 16KB 对齐
+            stl = "c++_shared"
+        }
+    }
+
+    // 打包选项：确保 native 库 16KB 对齐
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "**/*.so"
+            // 使用 legacy 打包方式避免 16KB 对齐问题
+            useLegacyPackaging = true
+        }
     }
 
     externalNativeBuild {
