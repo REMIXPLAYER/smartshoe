@@ -60,7 +60,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -1435,7 +1434,7 @@ object SettingScreen {
         // 显示错误
         errorMessage?.let { message ->
             onShowError?.invoke(message)
-            settingViewModel?.clearError()
+            settingViewModel.clearError()
         }
 
         LazyColumn(
@@ -1529,7 +1528,7 @@ object SettingScreen {
                 onDismiss = { settingViewModel?.hideLoginDialog() },
                 onLogin = { email, password ->
                     settingViewModel?.validateLoginForm()?.let { error ->
-                        settingViewModel?.showError(error)
+                        settingViewModel.showError(error)
                         return@LoginDialog
                     }
                     settingViewModel?.setLoginLoading(true)
@@ -1546,7 +1545,7 @@ object SettingScreen {
                 onDismiss = { settingViewModel?.hideRegisterDialog() },
                 onRegister = { username, email, password ->
                     settingViewModel?.validateRegisterForm()?.let { error ->
-                        settingViewModel?.showError(error)
+                        settingViewModel.showError(error)
                         return@RegisterDialog
                     }
                     settingViewModel?.setRegisterLoading(true)
