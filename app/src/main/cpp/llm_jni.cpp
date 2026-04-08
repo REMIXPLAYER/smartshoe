@@ -17,7 +17,6 @@
 struct LLMContext {
     llama_model* model = nullptr;
     llama_context* ctx = nullptr;
-    llama_sampler* sampler = nullptr;
     std::mutex mutex;
     bool is_loaded = false;
     
@@ -27,10 +26,6 @@ struct LLMContext {
     
     void release() {
         std::lock_guard<std::mutex> lock(mutex);
-        if (sampler) {
-            llama_sampler_free(sampler);
-            sampler = nullptr;
-        }
         if (ctx) {
             llama_free(ctx);
             ctx = nullptr;
@@ -44,15 +39,6 @@ struct LLMContext {
 };
 
 static std::unique_ptr<LLMContext> g_llm_context;
-
-static std::string token_to_piece(const llama_model* model, llama_token token) {
-    char buf[256];
-    int n = llama_token_to_piece(model, token, buf, sizeof(buf), 0, false);
-    if (n < 0) {
-        return "";
-    }
-    return std::string(buf, n);
-}
 
 extern "C" {
 
@@ -111,9 +97,6 @@ Java_com_example_smartshoe_llm_LLMNative_initModel(
         return JNI_FALSE;
     }
     
-    g_llm_context->sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    llama_sampler_chain_add(g_llm_context->sampler, llama_sampler_init_greedy());
-    
     g_llm_context->is_loaded = true;
     LOGI("Model loaded: n_threads=%d, n_ctx=%d", n_threads, n_ctx);
     
@@ -126,7 +109,7 @@ Java_com_example_smartshoe_llm_LLMNative_generate(
     jobject /* this */,
     jstring prompt,
     jint max_tokens,
-    jfloat temperature
+    jfloat /* temperature */
 ) {
     if (!g_llm_context) {
         return env->NewStringUTF("Error: Model not initialized");
@@ -150,12 +133,14 @@ Java_com_example_smartshoe_llm_LLMNative_generate(
     std::string prompt_str(prompt_cstr);
     env->ReleaseStringUTFChars(prompt, prompt_cstr);
     
+    // Qwen 对话格式
     std::string formatted_prompt = 
         "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
         "<|im_start|>user\n" + prompt_str + "<|im_end|>\n"
         "<|im_start|>assistant\n";
     
-    const int n_prompt_tokens = -llama_tokenize(
+    // Tokenize - 使用新版 API
+    const int n_tokens = llama_tokenize(
         g_llm_context->model,
         formatted_prompt.c_str(),
         formatted_prompt.length(),
@@ -165,62 +150,89 @@ Java_com_example_smartshoe_llm_LLMNative_generate(
         true
     );
     
-    if (n_prompt_tokens <= 0) {
+    if (n_tokens <= 0) {
         return env->NewStringUTF("Error: Tokenization failed");
     }
     
-    std::vector<llama_token> prompt_tokens(n_prompt_tokens);
+    std::vector<llama_token> tokens(n_tokens);
     if (llama_tokenize(
             g_llm_context->model,
             formatted_prompt.c_str(),
             formatted_prompt.length(),
-            prompt_tokens.data(),
-            prompt_tokens.size(),
+            tokens.data(),
+            tokens.size(),
             true,
-            true) < 0) {
+            true) <= 0) {
         return env->NewStringUTF("Error: Tokenization failed");
     }
     
-    llama_batch batch = llama_batch_init(prompt_tokens.size(), 0, 1);
+    // 创建 batch 并解码
+    llama_batch batch = llama_batch_init(tokens.size(), 0, 1);
     
-    for (size_t i = 0; i < prompt_tokens.size(); i++) {
-        common_batch_add(batch, prompt_tokens[i], static_cast<llama_pos>(i), {0}, false);
+    for (size_t i = 0; i < tokens.size(); i++) {
+        common_batch_add(batch, tokens[i], static_cast<llama_pos>(i), {0}, false);
     }
     batch.logits[batch.n_tokens - 1] = true;
     
     if (llama_decode(g_llm_context->ctx, batch) != 0) {
         llama_batch_free(batch);
-        return env->NewStringUTF("Error: Failed to decode");
+        return env->NewStringUTF("Error: Failed to decode prompt");
     }
     
     llama_batch_free(batch);
     
-    llama_sampler_chain_clear(g_llm_context->sampler);
-    llama_sampler_chain_add(g_llm_context->sampler, llama_sampler_init_greedy());
-    
+    // 生成 - 使用贪心采样（最简单的方式）
     std::string response;
-    llama_token new_token_id;
-    int n_pos = prompt_tokens.size();
+    llama_token new_token;
+    int n_pos = tokens.size();
+    const llama_vocab* vocab = llama_model_vocab(g_llm_context->model);
     
     for (int i = 0; i < max_tokens; i++) {
-        new_token_id = llama_sampler_sample(g_llm_context->sampler, 
-            g_llm_context->ctx, -1);
+        // 获取 logits
+        const float* logits = llama_get_logits_ith(g_llm_context->ctx, -1);
         
-        if (llama_token_is_eog(new_token_id)) {
+        // 贪心采样 - 找最大值
+        int n_vocab = llama_model_n_vocab(g_llm_context->model);
+        new_token = 0;
+        float max_logit = logits[0];
+        
+        for (int j = 1; j < n_vocab; j++) {
+            if (logits[j] > max_logit) {
+                max_logit = logits[j];
+                new_token = j;
+            }
+        }
+        
+        // 检查是否结束
+        if (llama_vocab_is_eog(vocab, new_token)) {
             break;
         }
         
-        response += token_to_piece(g_llm_context->model, new_token_id);
+        // 转换为文本
+        char buf[256];
+        int n = llama_token_to_piece(
+            g_llm_context->model, 
+            new_token, 
+            buf, 
+            sizeof(buf),
+            0,
+            true
+        );
         
-        llama_batch batch_next = llama_batch_init(1, 0, 1);
-        common_batch_add(batch_next, new_token_id, n_pos++, {0}, true);
+        if (n > 0) {
+            response.append(buf, n);
+        }
         
-        if (llama_decode(g_llm_context->ctx, batch_next) != 0) {
-            llama_batch_free(batch_next);
+        // 解码新 token
+        llama_batch next_batch = llama_batch_init(1, 0, 1);
+        common_batch_add(next_batch, new_token, n_pos++, {0}, true);
+        
+        if (llama_decode(g_llm_context->ctx, next_batch) != 0) {
+            llama_batch_free(next_batch);
             break;
         }
         
-        llama_batch_free(batch_next);
+        llama_batch_free(next_batch);
     }
     
     return env->NewStringUTF(response.c_str());
