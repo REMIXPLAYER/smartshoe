@@ -64,6 +64,9 @@ class ModelDownloadManager @Inject constructor(
         const val BUFFER_SIZE = 8192
         const val MIN_STORAGE_MB = 600
         const val MAX_RETRY_COUNT = 3
+        
+        // 模型文件扩展名
+        const val MODEL_FILE_EXTENSION = ".gguf"
     }
 
     enum class NetworkType { WIFI, MOBILE, NONE }
@@ -114,6 +117,47 @@ class ModelDownloadManager @Inject constructor(
             if (!exists()) mkdirs()
         }
         return File(modelsDir, fileName)
+    }
+
+    /**
+     * 获取模型目录
+     */
+    fun getModelsDir(): File {
+        return File(context.filesDir, "models").apply {
+            if (!exists()) mkdirs()
+        }
+    }
+
+    /**
+     * 清理所有模型文件（包括临时文件和旧版本）
+     */
+    suspend fun cleanupAllModels(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val modelsDir = getModelsDir()
+            var deleted = true
+
+            // 删除所有 .gguf 文件和 .tmp 文件
+            modelsDir.listFiles()?.forEach { file ->
+                if (file.name.endsWith(MODEL_FILE_EXTENSION) || file.name.endsWith(".tmp")) {
+                    if (!file.delete()) {
+                        deleted = false
+                    }
+                }
+            }
+            deleted
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 获取所有模型文件占用的空间
+     */
+    suspend fun getTotalModelsSize(): Long = withContext(Dispatchers.IO) {
+        val modelsDir = getModelsDir()
+        modelsDir.listFiles()?.filter {
+            it.name.endsWith(MODEL_FILE_EXTENSION) || it.name.endsWith(".tmp")
+        }?.sumOf { it.length() } ?: 0L
     }
 
     /**
@@ -288,6 +332,9 @@ class ModelDownloadManager @Inject constructor(
                 return@flow
             }
 
+            // 清理旧模型文件（避免重复占用空间）
+            cleanupOldModels(model.fileName)
+
             tempFile.renameTo(modelFile)
             emit(DownloadState.Success(modelFile))
         }
@@ -314,4 +361,21 @@ class ModelDownloadManager @Inject constructor(
             val file = getModelFile(model.fileName)
             if (file.exists()) file.length() else 0L
         }
+
+    /**
+     * 清理旧的模型文件（保留当前指定的模型）
+     */
+    private suspend fun cleanupOldModels(currentModelFileName: String) {
+        withContext(Dispatchers.IO) {
+            val modelsDir = getModelsDir()
+            modelsDir.listFiles()?.forEach { file ->
+                // 删除其他 .gguf 文件和 .tmp 文件
+                if ((file.name.endsWith(MODEL_FILE_EXTENSION) && file.name != currentModelFileName) ||
+                    file.name.endsWith(".tmp")
+                ) {
+                    file.delete()
+                }
+            }
+        }
+    }
 }
