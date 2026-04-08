@@ -51,10 +51,10 @@ class ModelDownloadManager @Inject constructor(
     )
 
     companion object {
-        // Hugging Face 直链 - Qwen2.5-0.5B-Instruct Q4_K_M 量化模型
+        // 魔搭社区 ModelScope - Qwen2.5-0.5B-Instruct Q4_K_M 量化模型（国内速度快）
         val DEFAULT_MODEL = ModelInfo(
             name = "Qwen2.5-0.5B-Instruct",
-            url = "https://huggingface.co/SecondState/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+            url = "https://modelscope.cn/models/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/master/qwen2.5-0.5b-instruct-q4_k_m.gguf",
             fileName = "qwen2.5-0.5b-instruct-q4_k_m.gguf",
             expectedSize = 386_000_000,  // 约 368MB
             expectedHash = "",
