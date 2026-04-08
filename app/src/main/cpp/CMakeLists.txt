@@ -9,6 +9,15 @@ set(LLAMA_CPP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
 
 # 检查 llama.cpp 是否存在
 if(EXISTS ${LLAMA_CPP_DIR}/CMakeLists.txt)
+    # 关键：启用 common 库构建（必须在 add_subdirectory 之前）
+    set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
+    set(LLAMA_STANDALONE OFF CACHE BOOL "Standalone build" FORCE)
+    
+    # 禁用不需要的组件以加快构建
+    set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
+    set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Build examples" FORCE)
+    set(LLAMA_BUILD_SERVER OFF CACHE BOOL "Build server" FORCE)
+    
     add_subdirectory(${LLAMA_CPP_DIR} llama.cpp)
 else()
     message(WARNING "llama.cpp not found at ${LLAMA_CPP_DIR}. Please add it as a submodule.")
