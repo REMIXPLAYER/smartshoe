@@ -1,4 +1,10 @@
 cmake_minimum_required(VERSION 3.22.1)
+
+# 必须在 project() 之前设置系统名称
+set(CMAKE_SYSTEM_NAME Android)
+set(CMAKE_SYSTEM_VERSION 21)
+set(CMAKE_ANDROID_ARCH_ABI arm64-v8a)
+
 project("smartshoe_llm")
 
 set(CMAKE_CXX_STANDARD 17)
@@ -9,9 +15,6 @@ set(LLAMA_CPP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
 
 # 检查 llama.cpp 是否存在
 if(EXISTS ${LLAMA_CPP_DIR}/CMakeLists.txt)
-    # 关键：禁用 macOS 特定的工具链检测
-    set(CMAKE_SYSTEM_NAME Android)
-    
     # 禁用 llama.cpp 中不需要的功能
     set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
     set(LLAMA_STANDALONE OFF CACHE BOOL "Standalone build" FORCE)
@@ -25,6 +28,10 @@ if(EXISTS ${LLAMA_CPP_DIR}/CMakeLists.txt)
     # 禁用 Git 版本检测
     set(LLAMA_BUILD_NUMBER 0 CACHE STRING "Build number" FORCE)
     set(LLAMA_BUILD_COMMIT "unknown" CACHE STRING "Build commit" FORCE)
+    
+    # 禁用所有可能调用 xcrun 的功能
+    set(LLAMA_METAL OFF CACHE BOOL "LLAMA_METAL" FORCE)
+    set(LLAMA_ACCELERATE OFF CACHE BOOL "LLAMA_ACCELERATE" FORCE)
     
     add_subdirectory(${LLAMA_CPP_DIR} llama.cpp)
 else()

@@ -34,6 +34,7 @@ import com.example.smartshoe.ui.viewmodel.AIAssistantViewModel
 
 @Composable
 fun AIAssistantScreen(
+    modifier: Modifier = Modifier,
     viewModel: AIAssistantViewModel = hiltViewModel()
 ) {
     val modelState by viewModel.modelState.collectAsStateWithLifecycle()
@@ -68,7 +69,7 @@ fun AIAssistantScreen(
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)

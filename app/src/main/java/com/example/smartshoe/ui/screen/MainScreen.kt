@@ -243,7 +243,9 @@ private fun MainAppScreen(
                 }
 
                 3 -> { // AI助手页面
-                    AIAssistantScreen()
+                    AIAssistantScreen(
+                        modifier = Modifier.padding(innerPadding)
+                    )
                 }
 
                 4 -> { // 设置页面
