@@ -21,9 +21,23 @@ android {
             useSupportLibrary = true
         }
 
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
 
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-O3 -DNDEBUG"
+                arguments += "-DANDROID_STL=c++_shared"
+            }
+        }
+    }
 
-
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {
@@ -73,9 +87,11 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            // 添加更多排除
             excludes += "**/*.txt"
             excludes += "**/*.xml"
+        }
+        jniLibs {
+            keepDebugSymbols += "**/*.so"
         }
     }
 }
@@ -116,4 +132,11 @@ dependencies {
 
     // Hilt ViewModel 支持
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+
+    // 网络请求 (用于下载模型)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // 协程
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
