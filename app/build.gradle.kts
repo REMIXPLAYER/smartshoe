@@ -115,6 +115,7 @@ dependencies {
     // UI组件
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation ("androidx.compose.ui:ui-viewbinding:1.5.4")
+    implementation("androidx.media3:media3-exoplayer:1.10.0")
 
     // 测试依赖
     testImplementation("junit:junit:4.13.2")
