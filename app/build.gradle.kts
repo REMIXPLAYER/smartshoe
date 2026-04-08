@@ -29,6 +29,9 @@ android {
             cmake {
                 cppFlags += "-O3 -DNDEBUG"
                 arguments += "-DANDROID_STL=c++_shared"
+                arguments += "-DLLAMA_BUILD_COMMON=ON"
+                arguments += "-DLLAMA_METAL=OFF"
+                arguments += "-DLLAMA_ACCELERATE=OFF"
             }
         }
     }

@@ -1,10 +1,4 @@
 cmake_minimum_required(VERSION 3.22.1)
-
-# 必须在 project() 之前设置系统名称
-set(CMAKE_SYSTEM_NAME Android)
-set(CMAKE_SYSTEM_VERSION 21)
-set(CMAKE_ANDROID_ARCH_ABI arm64-v8a)
-
 project("smartshoe_llm")
 
 set(CMAKE_CXX_STANDARD 17)
@@ -15,9 +9,21 @@ set(LLAMA_CPP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
 
 # 检查 llama.cpp 是否存在
 if(EXISTS ${LLAMA_CPP_DIR}/CMakeLists.txt)
+    # 这些选项通过 Gradle 传递，这里不需要重复设置
+    # 但为了保险起见，如果未设置则使用默认值
+    if(NOT DEFINED LLAMA_BUILD_COMMON)
+        set(LLAMA_BUILD_COMMON ON)
+    endif()
+    
+    if(NOT DEFINED LLAMA_METAL)
+        set(LLAMA_METAL OFF)
+    endif()
+    
+    if(NOT DEFINED LLAMA_ACCELERATE)
+        set(LLAMA_ACCELERATE OFF)
+    endif()
+    
     # 禁用 llama.cpp 中不需要的功能
-    set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
-    set(LLAMA_STANDALONE OFF CACHE BOOL "Standalone build" FORCE)
     set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
     set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Build examples" FORCE)
     set(LLAMA_BUILD_SERVER OFF CACHE BOOL "Build server" FORCE)
@@ -28,10 +34,6 @@ if(EXISTS ${LLAMA_CPP_DIR}/CMakeLists.txt)
     # 禁用 Git 版本检测
     set(LLAMA_BUILD_NUMBER 0 CACHE STRING "Build number" FORCE)
     set(LLAMA_BUILD_COMMIT "unknown" CACHE STRING "Build commit" FORCE)
-    
-    # 禁用所有可能调用 xcrun 的功能
-    set(LLAMA_METAL OFF CACHE BOOL "LLAMA_METAL" FORCE)
-    set(LLAMA_ACCELERATE OFF CACHE BOOL "LLAMA_ACCELERATE" FORCE)
     
     add_subdirectory(${LLAMA_CPP_DIR} llama.cpp)
 else()
