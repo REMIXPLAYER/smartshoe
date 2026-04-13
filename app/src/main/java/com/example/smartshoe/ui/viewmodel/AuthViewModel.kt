@@ -2,8 +2,8 @@ package com.example.smartshoe.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.smartshoe.data.model.UserState
-import com.example.smartshoe.data.repository.AuthRepository
+import com.example.smartshoe.domain.repository.AuthRepository
+import com.example.smartshoe.domain.model.UserState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

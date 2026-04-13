@@ -2,7 +2,7 @@ package com.example.smartshoe.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.smartshoe.data.repository.UserProfileRepository
+import com.example.smartshoe.domain.repository.UserProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,12 +34,8 @@ class UserProfileViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    init {
-        // 初始化时加载保存的体重
-        viewModelScope.launch {
-            _userWeight.value = userProfileRepository.getUserWeight()
-        }
-    }
+    // 注意：体重数据已在构造函数中通过MutableStateFlow初始化时加载
+    // 无需在init块中重复加载，避免配置变更时的重复操作
 
     /**
      * 更新用户体重

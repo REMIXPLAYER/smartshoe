@@ -27,9 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartshoe.R
+import com.example.smartshoe.domain.model.PressureStatus
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.util.ColorUtils
-import com.example.smartshoe.util.PressureStatus
 
 /**
  * 传感器画布组件
@@ -86,7 +86,7 @@ object SensorCanvas {
                         val canvasSize = Size(size.width, size.height)
 
                         sensorPositions.forEachIndexed { index, position ->
-                            val color = sensorColors.getOrElse(index) { Color.Gray }
+                            val color = sensorColors.getOrElse(index) { AppColors.DarkGray }
                             val bounds = calculateSensorBounds(canvasSize, position)
                             drawSensor(color, bounds, position.shape)
                         }
@@ -98,7 +98,7 @@ object SensorCanvas {
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color.LightGray.copy(alpha = 0.5f),
+                        color = AppColors.LightGray.copy(alpha = 0.5f),
                         thickness = 1.dp
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -135,7 +135,7 @@ object SensorCanvas {
                     Text(
                         "传感器 ${index + 1}",
                         fontSize = 14.sp,
-                        color = Color.Gray,
+                        color = AppColors.DarkGray,
                         fontWeight = FontWeight.Medium
                     )
 
@@ -145,7 +145,7 @@ object SensorCanvas {
                         value.toString(),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (value > 0) AppColors.Title else Color.Gray
+                        color = if (value > 0) AppColors.Title else AppColors.DarkGray
                     )
 
                     Spacer(modifier = Modifier.height(2.dp))
@@ -153,7 +153,7 @@ object SensorCanvas {
                     // 显示压力状态描述（替代原来的"单位"）
                     val status = pressureStatuses.getOrNull(index) ?: PressureStatus.NONE
                     val statusColor = when (status) {
-                        PressureStatus.NONE -> Color.LightGray
+                        PressureStatus.NONE -> AppColors.LightGray
                         PressureStatus.NORMAL -> ColorUtils.COLOR_NORMAL
                         PressureStatus.HIGH -> ColorUtils.COLOR_HIGH
                         PressureStatus.CRITICAL -> ColorUtils.COLOR_CRITICAL
@@ -242,7 +242,7 @@ object SensorCanvas {
                 val canvasSize = Size(size.width, size.height)
 
                 sensorPositions.forEachIndexed { index, position ->
-                    val color = sensorColors.getOrElse(index) { Color.Gray }
+                    val color = sensorColors.getOrElse(index) { AppColors.DarkGray }
                     val bounds = calculateSensorBounds(canvasSize, position)
                     drawSensor(color, bounds, position.shape)
                 }

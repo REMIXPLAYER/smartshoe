@@ -5,16 +5,21 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import com.example.smartshoe.data.local.LocalDataSource
 import com.example.smartshoe.data.local.SharedPreferencesDataSource
+import com.example.smartshoe.data.remote.AiAssistantApiService
+import com.example.smartshoe.data.remote.AiAssistantApiServiceImpl
 import com.example.smartshoe.data.remote.AuthApiService
 import com.example.smartshoe.data.remote.AuthApiServiceImpl
 import com.example.smartshoe.data.remote.SensorDataApiService
 import com.example.smartshoe.data.remote.SensorDataApiServiceImpl
+import com.example.smartshoe.domain.repository.AuthRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 /**
@@ -55,6 +60,20 @@ abstract class AppModule {
             return SharedPreferencesDataSource(context)
         }
 
+        /**
+         * 提供OkHttpClient
+         * 用于SSE和其他网络请求
+         */
+        @Provides
+        @Singleton
+        fun provideOkHttpClient(): OkHttpClient {
+            return OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)  // SSE需要长超时
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .build()
+        }
+
         // UserPreferencesManager 使用 @Inject 构造函数，Hilt 会自动处理
         // 不需要手动提供
     }
@@ -76,4 +95,13 @@ abstract class AppModule {
     abstract fun bindAuthApiService(
         impl: AuthApiServiceImpl
     ): AuthApiService
+
+    /**
+     * 绑定 AiAssistantApiService 接口到其实现类
+     */
+    @Binds
+    @Singleton
+    abstract fun bindAiAssistantApiService(
+        impl: AiAssistantApiServiceImpl
+    ): AiAssistantApiService
 }

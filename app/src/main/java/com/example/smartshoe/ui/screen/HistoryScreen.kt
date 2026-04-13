@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,8 +28,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.smartshoe.R
 import com.example.smartshoe.ui.theme.AppColors
-import com.example.smartshoe.data.model.SensorDataPoint
-import com.example.smartshoe.data.model.SensorDataRecord
+import com.example.smartshoe.domain.model.SensorDataPoint
+import com.example.smartshoe.domain.model.SensorDataRecord
 import com.example.smartshoe.ui.component.chart.ChartConfigUtils
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener
@@ -40,6 +41,7 @@ object HistoryScreen {
 
     /**
      * 历史记录主界面
+     * 新增：支持AI分析功能
      */
     @Composable
     fun HistoryScreen(
@@ -54,6 +56,7 @@ object HistoryScreen {
         onEndDateChange: (Date?) -> Unit,
         onQueryClick: () -> Unit,
         onRecordSelect: (SensorDataRecord?) -> Unit,
+        onAiAnalysisClick: ((String) -> Unit)? = null,  // 新增：AI分析回调
         queryExecuted: Boolean = false,
         modifier: Modifier = Modifier,
         onShowDatePicker: ((Date, (Date) -> Unit) -> Unit)? = null
@@ -121,11 +124,14 @@ object HistoryScreen {
                         ) {
                             CircularProgressIndicator(color = AppColors.Primary)
                         }
-                    } else if (recordData.isNotEmpty()) {
+                    } else {
+                        // 无论recordData是否为空，都显示详情页面
+                        // 如果数据为空，图表区域会显示"暂无数据"
                         SelectedRecordDetail(
                             record = selectedRecord,
                             data = recordData,
-                            onBackClick = { onRecordSelect(null) }
+                            onBackClick = { onRecordSelect(null) },
+                            onAiAnalysisClick = onAiAnalysisClick
                         )
                     }
                 }
@@ -158,13 +164,40 @@ object HistoryScreen {
             Column(
                 modifier = Modifier.padding(16.dp)
             ) {
-                Text(
-                    text = "选择时间范围",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AppColors.Primary,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
+                // 标题栏：标题在左，清除按钮在右
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "选择时间范围",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.Primary
+                    )
+
+                    // 清除按钮（当选择了日期时显示在右上角）
+                    if (startDate != null || endDate != null) {
+                        FilledTonalButton(
+                            onClick = {
+                                onStartDateChange(null)
+                                onEndDateChange(null)
+                            },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = AppColors.Primary.copy(alpha = 0.1f),
+                                contentColor = AppColors.Primary
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("清除", fontSize = 13.sp)
+                        }
+                    }
+                }
 
                 // 开始和结束时间 - 水平排列
                 Row(
@@ -187,7 +220,8 @@ object HistoryScreen {
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -205,7 +239,7 @@ object HistoryScreen {
                                 Text(
                                     text = startDate?.let { DateTimeUtils.formatDate(it.time) } ?: "未选择",
                                     fontSize = 13.sp,
-                                    color = if (startDate != null) Color(0xFF666666) else Color.Gray
+                                    color = if (startDate != null) AppColors.MediumGray else AppColors.DarkGray
                                 )
                             }
                         }
@@ -226,7 +260,8 @@ object HistoryScreen {
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -244,32 +279,14 @@ object HistoryScreen {
                                 Text(
                                     text = endDate?.let { DateTimeUtils.formatDate(it.time) } ?: "未选择",
                                     fontSize = 13.sp,
-                                    color = if (endDate != null) Color(0xFF666666) else Color.Gray
+                                    color = if (endDate != null) AppColors.MediumGray else AppColors.DarkGray
                                 )
                             }
                         }
                     }
                 }
 
-                // 清除日期按钮（当选择了日期时显示）
-                if (startDate != null || endDate != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(
-                        onClick = {
-                            onStartDateChange(null)
-                            onEndDateChange(null)
-                        },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text(
-                            text = "清除日期筛选",
-                            fontSize = 12.sp,
-                            color = AppColors.Primary
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // 查询按钮
                 Button(
@@ -279,7 +296,8 @@ object HistoryScreen {
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AppColors.Primary
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
@@ -399,12 +417,14 @@ object HistoryScreen {
 
     /**
      * 选中记录的详细图表展示
+     * 新增：AI分析按钮
      */
     @Composable
     private fun SelectedRecordDetail(
         record: SensorDataRecord,
         data: List<SensorDataPoint>,
-        onBackClick: () -> Unit
+        onBackClick: () -> Unit,
+        onAiAnalysisClick: ((String) -> Unit)? = null
     ) {
         Card(
             modifier = Modifier
@@ -419,33 +439,53 @@ object HistoryScreen {
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp)
             ) {
-                // 记录信息标题栏，包含返回按钮
+                // 记录信息标题栏，包含返回按钮和AI分析按钮
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 返回按钮
-                    IconButton(
-                        onClick = onBackClick,
-                        modifier = Modifier.size(40.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.leftarrow),
-                            contentDescription = "返回",
-                            tint = AppColors.Primary,
-                            modifier = Modifier.size(24.dp)
+                        // 返回按钮
+                        IconButton(
+                            onClick = onBackClick,
+                            modifier = Modifier.size(40.dp),
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.leftarrow),
+                                contentDescription = "返回",
+                                tint = AppColors.Primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = "记录详情",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AppColors.Primary
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = "记录详情",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.Primary
-                    )
+                    // AI分析按钮
+                    if (onAiAnalysisClick != null) {
+                        FilledTonalButton(
+                            onClick = { onAiAnalysisClick(record.recordId) },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = AppColors.Primary.copy(alpha = 0.1f),
+                                contentColor = AppColors.Primary
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
+                        ) {
+                            Text("AI分析", fontSize = 13.sp)
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -612,7 +652,7 @@ object HistoryScreen {
                     record = record,
                     sensorIndex = 0,
                     sensorName = "传感器 1 - 脚掌前部",
-                    color = Color(0xFFFF6B6B)
+                    color = AppColors.Sensor1
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -632,7 +672,7 @@ object HistoryScreen {
                     record = record,
                     sensorIndex = 1,
                     sensorName = "传感器 2 - 脚弓部",
-                    color = Color(0xFF4ECDC4)
+                    color = AppColors.Sensor2
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -652,7 +692,7 @@ object HistoryScreen {
                     record = record,
                     sensorIndex = 2,
                     sensorName = "传感器 3 - 脚跟部",
-                    color = Color(0xFF45B7D1)
+                    color = AppColors.Sensor3
                 )
             }
         }
@@ -662,6 +702,8 @@ object HistoryScreen {
      * 单个传感器图表项（无Card包装）
      * 与数据记录页面保持相同设计风格
      * 支持拖动查看时显示选中点的值
+     *
+     * 性能优化：仅在渲染层对数据进行采样，原始数据保持不变
      */
     @Composable
     private fun SensorChartItem(
@@ -676,6 +718,54 @@ object HistoryScreen {
             mutableIntStateOf(
                 data.lastOrNull()?.getValue(sensorIndex) ?: 0
             )
+        }
+
+        // 性能优化：仅在渲染层对数据进行采样
+        // 原始数据保持不变，用于上传和完整分析
+        val sampledData by remember(data) {
+            derivedStateOf {
+                when {
+                    data.isEmpty() -> emptyList()
+                    data.size <= 200 -> data // 数据点较少时不采样
+                    else -> {
+                        // 智能采样：保留关键数据点（起点、终点、峰值、谷值）
+                        val sampleInterval = data.size / 150 // 目标约150个点
+                        val sampled = mutableListOf<SensorDataPoint>()
+                        
+                        // 始终保留第一个点
+                        sampled.add(data.first())
+                        
+                        var i = 1
+                        while (i < data.size - 1) {
+                            val current = data[i]
+                            val prev = data[i - 1]
+                            val next = data[i + 1]
+                            
+                            val currentValue = current.getValue(sensorIndex)
+                            val prevValue = prev.getValue(sensorIndex)
+                            val nextValue = next.getValue(sensorIndex)
+                            
+                            // 保留峰值、谷值或按间隔采样
+                            val isPeak = currentValue > prevValue && currentValue > nextValue
+                            val isValley = currentValue < prevValue && currentValue < nextValue
+                            val isIntervalPoint = i % sampleInterval == 0
+                            
+                            if (isPeak || isValley || isIntervalPoint) {
+                                sampled.add(current)
+                            }
+                            
+                            i++
+                        }
+                        
+                        // 始终保留最后一个点
+                        if (data.last() != sampled.lastOrNull()) {
+                            sampled.add(data.last())
+                        }
+                        
+                        sampled
+                    }
+                }
+            }
         }
 
         Column(
@@ -730,8 +820,8 @@ object HistoryScreen {
                             setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
                                 override fun onValueSelected(e: com.github.mikephil.charting.data.Entry?, h: com.github.mikephil.charting.highlight.Highlight?) {
                                     e?.let { entry ->
-                                        // 使用 ChartConfigUtils 查找最接近的数据点
-                                        val closestPoint = ChartConfigUtils.findClosestDataPoint(entry, data, firstTimestamp)
+                                        // 使用 ChartConfigUtils 查找最接近的数据点（在采样后的数据中查找）
+                                        val closestPoint = ChartConfigUtils.findClosestDataPoint(entry, sampledData, firstTimestamp)
                                         closestPoint?.let { point ->
                                             selectedValue = ChartConfigUtils.getSensorValue(point, sensorIndex)
                                         }
@@ -748,10 +838,10 @@ object HistoryScreen {
                         }
                     },
                     update = { chart ->
-                        // 使用 ChartConfigUtils 更新图表数据
+                        // 使用 ChartConfigUtils 更新图表数据（使用采样后的数据）
                         ChartConfigUtils.updateChartData(
                             chart,
-                            data,
+                            sampledData, // 使用采样后的数据渲染
                             sensorIndex,
                             firstTimestamp,
                             color,

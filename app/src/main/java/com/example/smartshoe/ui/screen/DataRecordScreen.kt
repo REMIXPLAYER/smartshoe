@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.smartshoe.ui.theme.AppColors
-import com.example.smartshoe.data.model.SensorDataPoint
+import com.example.smartshoe.domain.model.SensorDataPoint
 import com.example.smartshoe.ui.component.chart.ChartConfigUtils
 import com.example.smartshoe.ui.component.getDeviceDisplayName
 import com.github.mikephil.charting.charts.LineChart
@@ -81,7 +81,7 @@ object DataRecordScreen {
                                 modifier = Modifier
                                     .size(10.dp)
                                     .background(
-                                        color = if (connectedDevice != null) Color(0xFF4CAF50) else Color.Gray,
+                                        color = if (connectedDevice != null) AppColors.Success else AppColors.DarkGray,
                                         shape = CircleShape
                                     )
                             )
@@ -94,7 +94,7 @@ object DataRecordScreen {
                                     "设备未连接"
                                 },
                                 fontSize = 14.sp,
-                                color = if (connectedDevice != null) Color(0xFF4CAF50) else Color.Gray,
+                                color = if (connectedDevice != null) AppColors.Success else AppColors.DarkGray,
                                 fontWeight = FontWeight.Medium
                             )
                         }

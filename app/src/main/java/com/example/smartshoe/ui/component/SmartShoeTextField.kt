@@ -8,7 +8,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
@@ -87,7 +86,7 @@ object SmartShoeTextField {
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             isError = isError,
             supportingText = if (isError && errorMessage != null) {
-                { Text(errorMessage, color = Color.Red) }
+                { Text(errorMessage, color = AppColors.Error) }
             } else null,
             modifier = modifier,
             singleLine = singleLine,
@@ -163,7 +162,7 @@ object SmartShoeTextField {
                         Icon(
                             painter = if (passwordVisible) visibilityIcon else visibilityOffIcon,
                             contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
-                            tint = Color.Gray
+                            tint = AppColors.DarkGray
                         )
                     }
                 }
@@ -223,7 +222,7 @@ object SmartShoeTextField {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             isError = isError,
             supportingText = if (isError && errorMessage != null) {
-                { Text(errorMessage, color = Color.Red) }
+                { Text(errorMessage, color = AppColors.Error) }
             } else null,
             modifier = modifier,
             singleLine = true,

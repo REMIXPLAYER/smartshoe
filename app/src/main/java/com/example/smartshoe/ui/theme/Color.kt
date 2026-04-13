@@ -39,4 +39,16 @@ object AppColors {
     // 图表网格线颜色
     val ChartGrid = Color(0xFFE0E0E0)            // 图表网格线
     val ChartText = Color(0xFF757575)            // 图表文字
+
+    // AI助手消息颜色
+    val UserMessage = Color(0xFF3949AB)          // 用户消息背景色
+    val AiMessage = Color(0xFFF5F5F5)            // AI消息背景色
+    val HealthAdviceCard = Color(0xFFE8F5E9)     // 健康建议卡片背景色
+    val HealthAdviceTitle = Color(0xFF2E7D32)    // 健康建议标题颜色
+    val Cursor = Color(0xFF3949AB)               // 流式光标颜色
+
+    // 通用UI颜色
+    val LightGray = Color(0xFFEEEEEE)            // 浅灰色（分隔线等）
+    val MediumGray = Color(0xFF666666)           // 中灰色（次要文字）
+    val DarkGray = Color.Gray                    // 深灰色
 }

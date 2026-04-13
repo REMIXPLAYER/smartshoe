@@ -7,7 +7,7 @@ import com.example.smartshoe.data.local.CircularBuffer
 import com.example.smartshoe.data.manager.BluetoothResourceManager
 import com.example.smartshoe.data.manager.MemoryLeakDetector
 import com.example.smartshoe.data.manager.PerformanceMonitor
-import com.example.smartshoe.data.model.SensorDataPoint
+import com.example.smartshoe.domain.model.SensorDataPoint
 import com.example.smartshoe.util.DateTimeUtils
 import kotlinx.coroutines.*
 import java.io.File

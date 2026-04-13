@@ -5,12 +5,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartshoe.config.AppConfig
-import com.example.smartshoe.data.manager.SensorDataManager
 import com.example.smartshoe.data.manager.UserPreferencesManager
-import com.example.smartshoe.data.model.SensorDataPoint
-import com.example.smartshoe.data.repository.SensorDataRepository
+import com.example.smartshoe.domain.model.SensorDataPoint
+import com.example.smartshoe.domain.model.SensorDataRecord
+import com.example.smartshoe.domain.model.PressureStatus
+import com.example.smartshoe.domain.repository.SensorDataRemoteRepository
+import com.example.smartshoe.domain.repository.SensorDataRepository
 import com.example.smartshoe.util.ColorUtils
-import com.example.smartshoe.util.PressureStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,14 +27,14 @@ private val INITIAL_SENSOR_COLOR = ColorUtils.COLOR_ZERO
  * 管理传感器数据相关的UI状态和逻辑
  *
  * 重构：
- * 1. 添加 SensorDataManager 依赖，封装数据上传功能
+ * 1. 添加 SensorDataRemoteRepository 依赖，封装数据上传功能
  * 2. 添加 UserPreferencesManager 依赖，管理用户偏好设置
  * 消除 MainActivity 直接访问 Manager 和 LocalDataSource 的问题
  */
 @HiltViewModel
 class SensorDataViewModel @Inject constructor(
     private val sensorDataRepository: SensorDataRepository,
-    private val sensorDataManager: SensorDataManager,
+    private val sensorDataRemoteRepository: SensorDataRemoteRepository,
     private val userPreferencesManager: UserPreferencesManager
 ) : ViewModel() {
 
@@ -252,7 +253,7 @@ class SensorDataViewModel @Inject constructor(
 
     /**
      * 上传传感器数据到服务器
-     * 封装 SensorDataManager 的上传功能，供 UI 层调用
+     * 封装 SensorDataRemoteRepository 的上传功能，供 UI 层调用
      *
      * @param dataPoints 要上传的数据点列表
      * @param onResult 上传结果回调 (success, message)
@@ -265,7 +266,7 @@ class SensorDataViewModel @Inject constructor(
         Log.d("BackupDebug", "数据点数量: ${dataPoints.size}")
         
         // 检查登录状态
-        if (!sensorDataManager.isLoggedIn()) {
+        if (!sensorDataRemoteRepository.isLoggedIn()) {
             Log.w("BackupDebug", "未登录，无法上传")
             onResult(false, "请先登录后再上传数据")
             return
@@ -279,10 +280,10 @@ class SensorDataViewModel @Inject constructor(
             return
         }
 
-        // 调用 Manager 上传数据
-        Log.d("BackupDebug", "调用 sensorDataManager.uploadSensorData()")
-        sensorDataManager.uploadSensorData(dataPoints) { success, message, info ->
-            Log.d("BackupDebug", "sensorDataManager.uploadSensorData 回调: success=$success, message=$message")
+        // 调用 Repository 上传数据
+        Log.d("BackupDebug", "调用 sensorDataRemoteRepository.uploadSensorData()")
+        sensorDataRemoteRepository.uploadSensorData(dataPoints) { success, message, info ->
+            Log.d("BackupDebug", "sensorDataRemoteRepository.uploadSensorData 回调: success=$success, message=$message")
             val resultMessage = if (success && info != null) {
                 val compressionInfo = String.format(
                     "压缩率: %.1f%% (${info.originalSize}B → ${info.compressedSize}B)",
@@ -329,23 +330,23 @@ class SensorDataViewModel @Inject constructor(
 
     /**
      * 获取用户的数据记录列表
-     * 封装 SensorDataManager 的查询功能
+     * 封装 SensorDataRemoteRepository 的查询功能
      *
      * @param page 页码
      * @param onResult 查询结果回调 (success, message, records)
      */
     fun getUserRecords(
         page: Int = 0,
-        onResult: (Boolean, String, List<com.example.smartshoe.data.model.SensorDataRecord>?) -> Unit
+        onResult: (Boolean, String, List<SensorDataRecord>?) -> Unit
     ) {
         // 检查登录状态
-        if (!sensorDataManager.isLoggedIn()) {
+        if (!sensorDataRemoteRepository.isLoggedIn()) {
             onResult(false, "请先登录", null)
             return
         }
 
-        // 调用 Manager 获取记录
-        sensorDataManager.getUserRecords(page = page) { success, message, records, total ->
+        // 调用 Repository 获取记录
+        sensorDataRemoteRepository.getUserRecords(page = page) { success, message, records, total ->
             val fullMessage = "$message (共${total}条)"
             onResult(success, fullMessage, records)
         }

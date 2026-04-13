@@ -1,8 +1,9 @@
 package com.example.smartshoe.data.remote
 
 import android.util.Log
-import com.example.smartshoe.data.model.SensorDataPoint
-import com.example.smartshoe.data.model.SensorDataRecord
+import com.example.smartshoe.domain.model.SensorDataPoint
+import com.example.smartshoe.domain.model.SensorDataRecord
+import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
@@ -107,12 +108,18 @@ interface SensorDataApiService {
 
 /**
  * 传感器数据API服务实现
- * 使用 Hilt 注入 RequestManager
+ * 使用共享的OkHttpClient实例
  */
 @Singleton
 class SensorDataApiServiceImpl @Inject constructor(
+    private val client: OkHttpClient,
     private val requestManager: RequestManager
 ) : SensorDataApiService, BaseApiService() {
+
+    /**
+     * 获取共享的OkHttpClient
+     */
+    override fun getOkHttpClient(): OkHttpClient = client
 
     companion object {
         private const val UPLOAD_PATH = "/sensor/upload"
@@ -373,6 +380,8 @@ class SensorDataApiServiceImpl @Inject constructor(
             val success = json.optBoolean("success", false)
 
             if (success) {
+                // 服务器使用ApiResult包装响应
+                // 对于列表API，data直接是数组，分页信息在pageInfo字段中
                 val dataArray = json.optJSONArray("data") ?: JSONArray()
                 val records = mutableListOf<SensorDataRecord>()
 
@@ -395,11 +404,13 @@ class SensorDataApiServiceImpl @Inject constructor(
                     )
                 }
 
+                // 分页信息在pageInfo字段中
+                val pageInfo = json.optJSONObject("pageInfo")
                 SensorDataRecordsResult.Success(
                     records = records,
-                    total = json.optLong("total", 0),
-                    page = json.optInt("page", 0),
-                    size = json.optInt("size", 0)
+                    total = pageInfo?.optLong("total", 0) ?: 0,
+                    page = pageInfo?.optInt("page", 0) ?: 0,
+                    size = pageInfo?.optInt("size", 0) ?: 0
                 )
             } else {
                 SensorDataRecordsResult.Error(json.optString("message", "获取失败"))
@@ -462,8 +473,10 @@ class SensorDataApiServiceImpl @Inject constructor(
             val success = json.optBoolean("success", false)
 
             if (success) {
-                val recordJson = json.optJSONObject("record") ?: JSONObject()
-                val dataArray = json.optJSONArray("data") ?: JSONArray()
+                // 服务器使用ApiResult包装响应，实际数据在data字段内
+                val dataJson = json.optJSONObject("data") ?: JSONObject()
+                val recordJson = dataJson.optJSONObject("record") ?: JSONObject()
+                val dataArray = dataJson.optJSONArray("data") ?: JSONArray()
 
                 val record = SensorDataRecord(
                     recordId = recordJson.optString("recordId", ""),

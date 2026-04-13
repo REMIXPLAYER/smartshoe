@@ -201,5 +201,38 @@ object AppConfig {
 
         // 百分比计算
         const val PERCENTAGE_BASE = 100.0
+
+        // 圆角半径
+        const val MODE_CORNER_RADIUS = 12
+    }
+
+    /**
+     * AI助手配置
+     */
+    object AiAssistant {
+        // 消息限制
+        const val MAX_MESSAGE_COUNT = 25
+        const val MAX_CACHE_SIZE = 10
+
+        // 流式更新配置
+        const val UPDATE_INTERVAL = 3
+        const val NANOSECONDS_TO_MILLISECONDS = 1_000_000L
+
+        // 时间戳默认值
+        const val DEFAULT_TIMESTAMP = 0L
+
+        // 模型名称默认值
+        const val DEFAULT_MODEL = "unknown"
+        const val ERROR_MODEL = "error"
+
+        // UI常量
+        const val MAX_MESSAGE_WIDTH_DP = 280  // 消息最大宽度
+        const val MESSAGE_CORNER_RADIUS = 16  // 消息圆角半径
+        const val MODE_CORNER_RADIUS = 16     // 模式选择器圆角半径
+
+        // LinkedHashMap缓存配置
+        const val CACHE_INITIAL_CAPACITY = 16
+        const val CACHE_LOAD_FACTOR = 0.75f
+        const val CACHE_ACCESS_ORDER = true
     }
 }

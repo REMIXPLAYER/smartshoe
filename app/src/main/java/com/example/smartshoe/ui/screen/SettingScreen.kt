@@ -31,13 +31,13 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -60,7 +60,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -72,7 +71,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.smartshoe.R
-import com.example.smartshoe.data.model.UserState
+import com.example.smartshoe.domain.model.UserState
 import com.example.smartshoe.ui.component.DeviceSettingItem
 import com.example.smartshoe.ui.component.ExpandableArrowIcon
 import com.example.smartshoe.ui.component.SmartShoeTextField
@@ -123,8 +122,8 @@ object SettingScreen {
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .background(Color.White, CircleShape)
-                        .border(3.dp, Color.White.copy(alpha = 0.5f), CircleShape),
+                        .background(AppColors.Background, CircleShape)
+                        .border(3.dp, AppColors.Background.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -142,13 +141,13 @@ object SettingScreen {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (userState.isLoggedIn) userState.username else "未登录",
-                        color = Color.White,
+                        color = AppColors.Background,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = if (userState.isLoggedIn) userState.email else "点击登录账户",
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = AppColors.Background.copy(alpha = 0.85f),
                         fontSize = 14.sp
                     )
                 }
@@ -160,9 +159,9 @@ object SettingScreen {
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.edit),
+                            imageVector = Icons.Default.Edit,
                             contentDescription = "编辑",
-                            tint = Color.White,
+                            tint = AppColors.Background,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -171,7 +170,7 @@ object SettingScreen {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = "登录",
-                        tint = Color.White.copy(alpha = 0.7f),
+                        tint = AppColors.Background.copy(alpha = 0.7f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -203,7 +202,7 @@ object SettingScreen {
                 .fillMaxWidth()
                 .height(90.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = AppColors.Background),
             shape = RoundedCornerShape(16.dp)
         ) {
             Row(
@@ -218,31 +217,31 @@ object SettingScreen {
                     icon = R.drawable.bluetooth,
                     label = "设备状态",
                     value = if (isConnected) "已连接" else "未连接",
-                    indicatorColor = if (isConnected) AppColors.Success else Color.Gray,
+                    indicatorColor = if (isConnected) AppColors.Success else AppColors.DarkGray,
                     isActive = isConnected
                 )
                 
                 // 分隔线
                 StatsDivider()
-                
+
                 // 体重数据
                 StatItem(
                     icon = R.drawable.man,
                     label = "体重数据",
                     value = if (weight > 0) "${weight}kg" else "未设置",
-                    indicatorColor = if (weight > 0) AppColors.Primary else Color.Gray,
+                    indicatorColor = if (weight > 0) AppColors.Primary else AppColors.DarkGray,
                     isActive = weight > 0
                 )
                 
                 // 分隔线
                 StatsDivider()
-                
+
                 // 备份状态
                 val (backupText, backupColor) = when (uploadStatus) {
                     UploadStatus.UPLOADING -> "上传中" to AppColors.Primary
                     UploadStatus.SUCCESS -> "已备份" to AppColors.Success
                     UploadStatus.FAILED -> "失败" to AppColors.Error
-                    else -> "未备份" to Color.Gray
+                    else -> "未备份" to AppColors.DarkGray
                 }
                 StatItem(
                     icon = R.drawable.cloud,
@@ -281,7 +280,7 @@ object SettingScreen {
                 Icon(
                     painter = painterResource(icon),
                     contentDescription = label,
-                    tint = if (isActive) indicatorColor else Color.Gray,
+                    tint = if (isActive) indicatorColor else AppColors.DarkGray,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -290,7 +289,7 @@ object SettingScreen {
                 text = value,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isActive) indicatorColor else Color.Gray
+                color = if (isActive) indicatorColor else AppColors.DarkGray
             )
         }
     }
@@ -301,7 +300,7 @@ object SettingScreen {
             modifier = Modifier
                 .height(50.dp)
                 .width(1.dp),
-            color = Color(0xFFEEEEEE)
+            color = AppColors.LightGray
         )
     }
 
@@ -334,7 +333,7 @@ object SettingScreen {
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = AppColors.Background),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(
@@ -390,7 +389,7 @@ object SettingScreen {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(12.dp))
 
                         // 设备列表
@@ -398,7 +397,7 @@ object SettingScreen {
                             Text(
                                 text = "暂无可用设备，请确保蓝牙已开启",
                                 fontSize = 14.sp,
-                                color = Color.Gray,
+                                color = AppColors.DarkGray,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         } else {
@@ -451,7 +450,7 @@ object SettingScreen {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(12.dp))
 
                         if (isEditingWeight) {
@@ -522,7 +521,7 @@ object SettingScreen {
                                     Icon(
                                         painter = painterResource(R.drawable.close),
                                         contentDescription = "取消",
-                                        tint = Color.Gray,
+                                        tint = AppColors.DarkGray,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
@@ -542,7 +541,7 @@ object SettingScreen {
                                     text = if (userWeight > 0) "${userWeight} kg" else "未设置",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (userWeight > 0) AppColors.Primary else Color.Gray
+                                    color = if (userWeight > 0) AppColors.Primary else AppColors.DarkGray
                                 )
                             }
                         }
@@ -557,7 +556,7 @@ object SettingScreen {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Row(
@@ -575,7 +574,7 @@ object SettingScreen {
                                 Text(
                                     text = "检测到异常压力时通知",
                                     fontSize = 12.sp,
-                                    color = Color.Gray
+                                    color = AppColors.DarkGray
                                 )
                             }
                             Switch(
@@ -598,67 +597,95 @@ object SettingScreen {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // 备份状态提示
-                        Text(
-                            text = when {
-                                !isLoggedIn -> "请先登录后再备份数据"
-                                !hasData -> "暂无数据可备份"
-                                else -> "选择要备份的数据"
-                            },
-                            fontSize = 14.sp,
-                            color = if (!isLoggedIn || !hasData) Color.Gray else AppColors.OnSurface
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // 备份按钮
-                        Button(
-                            onClick = {
-                                if (isLoggedIn && hasData) {
-                                    onBackupClick()
-                                }
-                            },
-                            enabled = isLoggedIn && hasData && uploadStatus != UploadStatus.UPLOADING,
+                        // 备份状态行（文字在左，按钮/状态在右）
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = AppColors.Primary
-                            )
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // 左侧状态文字
+                            Column {
+                                Text(
+                                    text = "数据备份",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = AppColors.OnSurface
+                                )
+                                Text(
+                                    text = when {
+                                        !isLoggedIn -> "请先登录"
+                                        !hasData -> "暂无数据"
+                                        uploadStatus == UploadStatus.UPLOADING -> "上传中..."
+                                        uploadStatus == UploadStatus.SUCCESS -> "上传成功"
+                                        uploadStatus == UploadStatus.FAILED -> "上传失败"
+                                        else -> "点击备份"
+                                    },
+                                    fontSize = 12.sp,
+                                    color = when (uploadStatus) {
+                                        UploadStatus.SUCCESS -> AppColors.Success
+                                        UploadStatus.FAILED -> AppColors.Error
+                                        else -> AppColors.DarkGray
+                                    }
+                                )
+                            }
+
+                            // 右侧按钮或状态图标
                             when (uploadStatus) {
                                 UploadStatus.UPLOADING -> {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        color = Color.White,
+                                        modifier = Modifier.size(24.dp),
+                                        color = AppColors.Primary,
                                         strokeWidth = 2.dp
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("上传中...")
                                 }
                                 UploadStatus.SUCCESS -> {
-                                    Text("备份成功")
+                                    // 绿色成功勾选图标
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .background(AppColors.Success, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.check),
+                                            contentDescription = "备份成功",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
                                 UploadStatus.FAILED -> {
-                                    Text("备份失败，重试")
+                                    // 失败重试按钮
+                                    TextButton(
+                                        onClick = { if (isLoggedIn && hasData) onBackupClick() },
+                                        enabled = isLoggedIn && hasData
+                                    ) {
+                                        Text(
+                                            "重试",
+                                            color = if (isLoggedIn && hasData) AppColors.Error else AppColors.DarkGray,
+                                            fontSize = 14.sp
+                                        )
+                                    }
                                 }
                                 else -> {
-                                    Text("立即备份到云端")
+                                    // 未上传状态显示上传图标（无背景，只改变图标颜色）
+                                    Icon(
+                                        painter = painterResource(R.drawable.upload),
+                                        contentDescription = "备份",
+                                        tint = if (isLoggedIn && hasData) AppColors.Primary else AppColors.DarkGray.copy(alpha = 0.3f),
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clickable(
+                                                enabled = isLoggedIn && hasData,
+                                                onClick = { onBackupClick() }
+                                            )
+                                    )
                                 }
                             }
                         }
-
-                        // TODO: 后续增加本地记录选择功能
-                        /*
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "选择要上传的记录：",
-                            fontSize = 14.sp,
-                            color = AppColors.OnSurface
-                        )
-                        // 这里可以添加本地记录列表供用户选择
-                        */
                     }
                 }
             }
@@ -692,7 +719,7 @@ object SettingScreen {
                 Icon(
                     painter = painterResource(icon),
                     contentDescription = label,
-                    tint = if (isActive) Color.White else AppColors.Primary,
+                    tint = if (isActive) AppColors.Background else AppColors.Primary,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -700,28 +727,31 @@ object SettingScreen {
             Text(
                 text = label,
                 fontSize = 13.sp,
-                color = if (isActive) AppColors.Primary else Color.Gray,
+                color = if (isActive) AppColors.Primary else AppColors.DarkGray,
                 fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal
             )
         }
     }
 
-    // ==================== 设置列表（复用AboutApp内容，整合在一个卡片内） ====================
+    // ==================== 设置列表（复用AboutApp内容，整合在一个卡片内）====================
     @Composable
     fun SettingsList(
         isVersionExpanded: Boolean,
         isHelpExpanded: Boolean,
         isPrivacyExpanded: Boolean,
+        isClearCacheExpanded: Boolean,
         onVersionExpandedChange: (Boolean) -> Unit,
         onHelpExpandedChange: (Boolean) -> Unit,
-        onPrivacyExpandedChange: (Boolean) -> Unit
+        onPrivacyExpandedChange: (Boolean) -> Unit,
+        onClearCacheExpandedChange: (Boolean) -> Unit,
+        onClearCache: () -> Unit
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = AppColors.Background),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(
@@ -754,7 +784,7 @@ object SettingScreen {
                 // 分隔线
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    color = Color(0xFFEEEEEE)
+                    color = AppColors.LightGray
                 )
 
                 // 使用帮助
@@ -794,7 +824,7 @@ object SettingScreen {
                 // 分隔线
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    color = Color(0xFFEEEEEE)
+                    color = AppColors.LightGray
                 )
 
                 // 隐私政策
@@ -804,7 +834,7 @@ object SettingScreen {
                     subtitle = "查看隐私保护条款",
                     isExpanded = isPrivacyExpanded,
                     onExpandedChange = onPrivacyExpandedChange,
-                    isLastItem = true
+                    isLastItem = false
                 ) {
                     Column(
                         modifier = Modifier
@@ -814,7 +844,7 @@ object SettingScreen {
                         Text(
                             text = "最后更新日期: 2026年4月",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = AppColors.DarkGray
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
@@ -825,6 +855,60 @@ object SettingScreen {
                             color = Color.DarkGray,
                             lineHeight = 20.sp
                         )
+                    }
+                }
+
+                // 分隔线
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = AppColors.LightGray
+                )
+
+                // 清除缓存
+                AboutAppItem(
+                    appIcon = AppIcons.Delete,
+                    title = "清除缓存",
+                    subtitle = "清除应用本地数据",
+                    isExpanded = isClearCacheExpanded,
+                    onExpandedChange = onClearCacheExpandedChange,
+                    isLastItem = true
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = "清除缓存将删除以下数据：",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = AppColors.OnSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "• 用户登录信息\n• 蓝牙设备列表\n• 传感器历史数据\n• 体重设置\n• 临时文件",
+                            fontSize = 13.sp,
+                            color = Color.DarkGray,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onClearCache,
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Error),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = "清除",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("确认清除缓存", color = AppColors.Background, fontSize = 14.sp)
+                        }
                     }
                 }
             }
@@ -886,7 +970,7 @@ object SettingScreen {
                     Text(
                         text = subtitle,
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = AppColors.DarkGray
                     )
                 }
                 ExpandableArrowIcon(
@@ -909,63 +993,7 @@ object SettingScreen {
             }
         }
     }
-
-    // ==================== 清除缓存按钮 ====================
-    @Composable
-    fun ClearCacheButton(
-        onClearCache: () -> Unit,
-        settingViewModel: SettingViewModel? = null
-    ) {
-        val showClearCacheConfirm = settingViewModel?.showClearCacheConfirm?.collectAsStateWithLifecycle()?.value ?: false
-
-        Button(
-            onClick = { settingViewModel?.showClearCacheConfirmDialog() },
-            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Error),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(48.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Delete,
-                contentDescription = "清除",
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("清除应用缓存", color = Color.White, fontSize = 16.sp)
-        }
-
-        // 清除缓存确认对话框
-        if (showClearCacheConfirm) {
-            AlertDialog(
-                onDismissRequest = { settingViewModel?.hideClearCacheConfirmDialog() },
-                title = { Text("清除缓存确认") },
-                text = {
-                    Text("确定要清除所有缓存数据吗？这将包括：\n• 用户数据\n• 蓝牙设备列表\n• 传感器数据\n• 体重数据\n• 连接状态\n• 临时文件\n\n此操作不可撤销。")
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            onClearCache()
-                            settingViewModel?.hideClearCacheConfirmDialog()
-                        }
-                    ) {
-                        Text("确认清除", color = AppColors.Error)
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { settingViewModel?.hideClearCacheConfirmDialog() }
-                    ) {
-                        Text("取消")
-                    }
-                }
-            )
-        }
-    }
-
-    // ==================== 登录/注册对话框（保持原有实现） ====================
+    // ==================== 登录/注册对话框（保持原有实现）====================
     @Composable
     private fun LoginDialog(
         onDismiss: () -> Unit,
@@ -992,7 +1020,7 @@ object SettingScreen {
                     .fillMaxWidth(0.9f)
                     .padding(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = AppColors.Background),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
@@ -1036,12 +1064,13 @@ object SettingScreen {
                             .height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppColors.Primary
-                        )
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
-                                color = Color.White,
+                                color = AppColors.Background,
                                 strokeWidth = 2.dp
                             )
                         } else {
@@ -1054,7 +1083,7 @@ object SettingScreen {
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("还没有账户？", fontSize = 14.sp, color = Color.Gray)
+                        Text("还没有账户？", fontSize = 14.sp, color = AppColors.DarkGray)
                         TextButton(onClick = onSwitchToRegister) {
                             Text("立即注册", color = AppColors.Primary, fontSize = 14.sp)
                         }
@@ -1064,7 +1093,7 @@ object SettingScreen {
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("取消", color = Color.Gray)
+                        Text("取消", color = AppColors.DarkGray)
                     }
                 }
             }
@@ -1100,7 +1129,7 @@ object SettingScreen {
                     .fillMaxWidth(0.9f)
                     .padding(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = AppColors.Background),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
@@ -1166,12 +1195,13 @@ object SettingScreen {
                             .height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppColors.Primary
-                        )
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
-                                color = Color.White,
+                                color = AppColors.Background,
                                 strokeWidth = 2.dp
                             )
                         } else {
@@ -1184,7 +1214,7 @@ object SettingScreen {
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("已有账户？", fontSize = 14.sp, color = Color.Gray)
+                        Text("已有账户？", fontSize = 14.sp, color = AppColors.DarkGray)
                         TextButton(onClick = onSwitchToLogin) {
                             Text("立即登录", color = AppColors.Primary, fontSize = 14.sp)
                         }
@@ -1194,7 +1224,7 @@ object SettingScreen {
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("取消", color = Color.Gray)
+                        Text("取消", color = AppColors.DarkGray)
                     }
                 }
             }
@@ -1232,7 +1262,7 @@ object SettingScreen {
                     .fillMaxWidth(0.9f)
                     .padding(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = AppColors.Background),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
@@ -1248,14 +1278,6 @@ object SettingScreen {
                         color = AppColors.Primary
                     )
                     Spacer(modifier = Modifier.height(20.dp))
-                    SmartShoeTextField.Username(
-                        value = username,
-                        onValueChange = { viewModel?.onEditProfileUsernameChange(it) },
-                        label = "用户名",
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = Icons.Default.Person
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
                     // 邮箱只显示，不可编辑
                     Row(
                         modifier = Modifier
@@ -1266,7 +1288,7 @@ object SettingScreen {
                         Icon(
                             imageVector = Icons.Default.Email,
                             contentDescription = null,
-                            tint = Color.Gray,
+                            tint = AppColors.DarkGray,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
@@ -1274,7 +1296,7 @@ object SettingScreen {
                             Text(
                                 text = "邮箱地址",
                                 fontSize = 12.sp,
-                                color = Color.Gray
+                                color = AppColors.DarkGray
                             )
                             Text(
                                 text = userState.email,
@@ -1283,6 +1305,14 @@ object SettingScreen {
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    SmartShoeTextField.Username(
+                        value = username,
+                        onValueChange = { viewModel?.onEditProfileUsernameChange(it) },
+                        label = "用户名（可选）",
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = Icons.Default.Person
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
                     SmartShoeTextField.Password(
                         value = currentPassword,
@@ -1325,23 +1355,24 @@ object SettingScreen {
                     Text(
                         text = "提示：修改资料需要输入当前密码验证",
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = AppColors.DarkGray
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = { onSave(username, userState.email, newPassword, currentPassword) },
-                        enabled = !isLoading && username.isNotBlank() && currentPassword.isNotBlank() && passwordsMatch,
+                        enabled = !isLoading && currentPassword.isNotBlank() && passwordsMatch,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppColors.Primary
-                        )
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
-                                color = Color.White,
+                                color = AppColors.Background,
                                 strokeWidth = 2.dp
                             )
                         } else {
@@ -1353,7 +1384,7 @@ object SettingScreen {
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("取消", color = Color.Gray)
+                        Text("取消", color = AppColors.DarkGray)
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -1369,7 +1400,8 @@ object SettingScreen {
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
+                            .height(48.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ExitToApp,
@@ -1377,7 +1409,7 @@ object SettingScreen {
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("退出登录", color = Color.White)
+                        Text("退出登录", color = AppColors.Background)
                     }
                 }
             }
@@ -1411,17 +1443,18 @@ object SettingScreen {
         onShowError: ((String) -> Unit)? = null,
         authUiState: AuthUiState = AuthUiState.Idle
     ) {
-        // 对话框状态
-        val showLoginDialog = settingViewModel?.showLoginDialog?.collectAsStateWithLifecycle()?.value ?: false
-        val showRegisterDialog = settingViewModel?.showRegisterDialog?.collectAsStateWithLifecycle()?.value ?: false
-        val isEditExpanded = settingViewModel?.isEditProfileExpanded?.collectAsStateWithLifecycle()?.value ?: false
-        val uploadStatus = settingViewModel?.uploadStatus?.collectAsStateWithLifecycle()?.value ?: UploadStatus.IDLE
+        // 对话框状态 - 使用collectAsStateWithLifecycle自动处理生命周期
+        val showLoginDialog by settingViewModel?.showLoginDialog?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
+        val showRegisterDialog by settingViewModel?.showRegisterDialog?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
+        val isEditExpanded by settingViewModel?.isEditProfileExpanded?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
+        val uploadStatus by settingViewModel?.uploadStatus?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(UploadStatus.IDLE) }
         val errorMessage = settingViewModel?.errorMessage?.collectAsStateWithLifecycle()?.value
 
         // 设置列表展开状态
         var isVersionExpanded by rememberSaveable { mutableStateOf(false) }
         var isHelpExpanded by rememberSaveable { mutableStateOf(false) }
         var isPrivacyExpanded by rememberSaveable { mutableStateOf(false) }
+        var isClearCacheExpanded by rememberSaveable { mutableStateOf(false) }
 
         // 监听认证状态
         LaunchedEffect(authUiState) {
@@ -1498,27 +1531,26 @@ object SettingScreen {
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // 设置列表（复用AboutApp内容）
+            // 设置列表（复用AboutApp内容，包含清除缓存）
             item {
+                // 互斥展开：展开一项时自动收起其他项
+                fun expandOnly(target: String) {
+                    isVersionExpanded = target == "version"
+                    isHelpExpanded = target == "help"
+                    isPrivacyExpanded = target == "privacy"
+                    isClearCacheExpanded = target == "clearCache"
+                }
+
                 SettingsList(
                     isVersionExpanded = isVersionExpanded,
                     isHelpExpanded = isHelpExpanded,
                     isPrivacyExpanded = isPrivacyExpanded,
-                    onVersionExpandedChange = { isVersionExpanded = it },
-                    onHelpExpandedChange = { isHelpExpanded = it },
-                    onPrivacyExpandedChange = { isPrivacyExpanded = it }
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // 清除缓存按钮
-            item {
-                ClearCacheButton(
-                    onClearCache = onClearCache,
-                    settingViewModel = settingViewModel
+                    isClearCacheExpanded = isClearCacheExpanded,
+                    onVersionExpandedChange = { expandOnly(if (it) "version" else "") },
+                    onHelpExpandedChange = { expandOnly(if (it) "help" else "") },
+                    onPrivacyExpandedChange = { expandOnly(if (it) "privacy" else "") },
+                    onClearCacheExpandedChange = { expandOnly(if (it) "clearCache" else "") },
+                    onClearCache = onClearCache
                 )
             }
         }
@@ -1559,6 +1591,11 @@ object SettingScreen {
 
         // 编辑资料对话框
         if (isEditExpanded && userState.isLoggedIn) {
+            // 初始化编辑表单
+            LaunchedEffect(Unit) {
+                settingViewModel?.initEditProfileForm(userState)
+            }
+            
             EditProfileDialog(
                 userState = userState,
                 onDismiss = { settingViewModel?.toggleEditProfileExpanded() },

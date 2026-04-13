@@ -4,7 +4,8 @@ import android.graphics.Color as AndroidColor
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.example.smartshoe.config.AppConfig
-import com.example.smartshoe.data.model.SensorDataPoint
+import com.example.smartshoe.domain.model.SensorDataPoint
+import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.util.DateTimeUtils
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
@@ -35,12 +36,13 @@ object ChartConfigUtils {
 
     /**
      * 传感器颜色配置
+     * 使用 AppColors 中定义的颜色，保持统一
      */
     object SensorColors {
-        val SENSOR_1 = Color(0xFFFF6B6B)  // 红色 - 脚掌前部
-        val SENSOR_2 = Color(0xFF4ECDC4)  // 青色 - 脚弓部
-        val SENSOR_3 = Color(0xFF45B7D1)  // 蓝色 - 脚跟部
-        val DEFAULT = Color(0xFF3949AB)   // 默认颜色
+        val SENSOR_1 = AppColors.Sensor1  // 红色 - 脚掌前部
+        val SENSOR_2 = AppColors.Sensor2  // 青色 - 脚弓部
+        val SENSOR_3 = AppColors.Sensor3  // 蓝色 - 脚跟部
+        val DEFAULT = AppColors.Primary   // 默认颜色
 
         fun getColor(sensorIndex: Int): Color {
             return when (sensorIndex) {

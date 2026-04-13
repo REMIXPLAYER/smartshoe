@@ -1,12 +1,9 @@
-package com.example.smartshoe.data.model
-
-import androidx.compose.runtime.Immutable
+package com.example.smartshoe.domain.model
 
 /**
  * 传感器数据点，包含数值和时间戳
- * 使用@Immutable注解帮助Compose编译器优化重组
+ * 纯领域模型，不依赖任何框架
  */
-@Immutable
 data class SensorDataPoint(
     val timestamp: Long,
     val sensor1: Int,
@@ -31,8 +28,8 @@ data class SensorDataPoint(
 /**
  * 传感器数据记录
  * 表示一次完整的数据采集记录
+ * 纯领域模型，不依赖任何框架
  */
-@Immutable
 data class SensorDataRecord(
     val recordId: String,
     val startTime: Long,

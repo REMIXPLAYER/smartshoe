@@ -2,9 +2,9 @@ package com.example.smartshoe.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.smartshoe.data.manager.SensorDataManager
-import com.example.smartshoe.data.model.UserState
-import com.example.smartshoe.data.repository.AuthRepository
+import com.example.smartshoe.domain.repository.SensorDataRemoteRepository
+import com.example.smartshoe.domain.model.UserState
+import com.example.smartshoe.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,7 +27,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val sensorDataManager: SensorDataManager
+    private val sensorDataRemoteRepository: SensorDataRemoteRepository
 ) : ViewModel() {
 
     // ==================== 登录对话框状态 ====================
@@ -273,7 +273,6 @@ class SettingViewModel @Inject constructor(
                 _editProfileNewPassword.value.isEmpty()
 
         return when {
-            _editProfileUsername.value.isBlank() -> "用户名不能为空"
             _editProfileCurrentPassword.value.isBlank() -> "请输入当前密码进行身份验证"
             !passwordsMatch -> "新密码不匹配"
             else -> null
@@ -286,8 +285,7 @@ class SettingViewModel @Inject constructor(
     fun isEditProfileFormValid(): Boolean {
         val passwordsMatch = _editProfileNewPassword.value == _editProfileConfirmPassword.value ||
                 _editProfileNewPassword.value.isEmpty()
-        return _editProfileUsername.value.isNotBlank() &&
-                _editProfileCurrentPassword.value.isNotBlank() &&
+        return _editProfileCurrentPassword.value.isNotBlank() &&
                 passwordsMatch
     }
 

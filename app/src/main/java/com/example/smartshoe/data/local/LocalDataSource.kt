@@ -2,7 +2,7 @@ package com.example.smartshoe.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.smartshoe.data.model.UserState
+import com.example.smartshoe.domain.model.UserState
 
 /**
  * 本地数据源接口

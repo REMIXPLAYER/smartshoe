@@ -2,10 +2,11 @@ package com.example.smartshoe.data.repository
 
 import android.util.Log
 import com.example.smartshoe.data.local.LocalDataSource
-import com.example.smartshoe.data.model.UserState
 import com.example.smartshoe.data.remote.AuthApiService
 import com.example.smartshoe.data.remote.AuthResult
 import com.example.smartshoe.data.remote.RequestManager
+import com.example.smartshoe.domain.repository.AuthRepository
+import com.example.smartshoe.domain.model.UserState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

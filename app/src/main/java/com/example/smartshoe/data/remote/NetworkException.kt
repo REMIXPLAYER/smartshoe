@@ -1,6 +1,6 @@
 package com.example.smartshoe.data.remote
 
-import com.example.smartshoe.data.model.UserState
+import com.example.smartshoe.domain.model.UserState
 
 /**
  * 网络层异常基类
@@ -66,6 +66,14 @@ sealed class NetworkException(
      */
     class ParseException(
         message: String = "数据解析失败",
+        cause: Throwable? = null
+    ) : NetworkException(message, cause)
+
+    /**
+     * 网络IO异常
+     */
+    class NetworkIOException(
+        message: String = "网络IO错误",
         cause: Throwable? = null
     ) : NetworkException(message, cause)
 

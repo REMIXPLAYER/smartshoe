@@ -1,10 +1,11 @@
 package com.example.smartshoe.ui.viewmodel
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.smartshoe.data.model.SensorDataPoint
-import com.example.smartshoe.data.model.SensorDataRecord
-import com.example.smartshoe.data.repository.HistoryRecordRepository
+import com.example.smartshoe.domain.repository.HistoryRecordRepository
+import com.example.smartshoe.domain.model.SensorDataPoint
+import com.example.smartshoe.domain.model.SensorDataRecord
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,8 +20,13 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class HistoryRecordViewModel @Inject constructor(
+    val savedStateHandle: SavedStateHandle,
     private val repository: HistoryRecordRepository
 ) : ViewModel(), HistoryRecordRepository.HistoryRecordCallback {
+
+    companion object {
+        private const val KEY_CALLBACK_INITIALIZED = "callback_initialized"
+    }
 
     // UI 状态 - 使用 StateFlow 管理
     private val _historyRecords = MutableStateFlow<List<SensorDataRecord>>(emptyList())
@@ -57,7 +63,12 @@ class HistoryRecordViewModel @Inject constructor(
     var onRecordDetailLoaded: (() -> Unit)? = null
 
     init {
-        repository.setCallback(this)
+        // 使用SavedStateHandle避免配置变更时重复设置回调
+        val isCallbackInitialized = savedStateHandle.get<Boolean>(KEY_CALLBACK_INITIALIZED) ?: false
+        if (!isCallbackInitialized) {
+            repository.setCallback(this)
+            savedStateHandle[KEY_CALLBACK_INITIALIZED] = true
+        }
     }
 
     /**
@@ -126,8 +137,8 @@ class HistoryRecordViewModel @Inject constructor(
      * 重置日期范围
      */
     fun resetDateRange() {
-        _historyStartDate.value = HistoryRecordRepository.getDefaultStartDate()
-        _historyEndDate.value = HistoryRecordRepository.getDefaultEndDate()
+        _historyStartDate.value = repository.getDefaultStartDate()
+        _historyEndDate.value = repository.getDefaultEndDate()
     }
 
     /**
@@ -145,21 +156,18 @@ class HistoryRecordViewModel @Inject constructor(
     }
 
     // Callback implementations
-    override fun onRecordsLoaded(records: List<SensorDataRecord>, page: Int, hasMorePages: Boolean) {
+    override fun onRecordsLoaded(records: List<SensorDataRecord>, hasMore: Boolean) {
         viewModelScope.launch {
-            if (page == 0) {
-                _historyRecords.value = emptyList()
-            }
             // 避免重复添加
             val existingIds = _historyRecords.value.map { it.recordId }.toSet()
             val newRecords = records.filter { it.recordId !in existingIds }
             _historyRecords.value = _historyRecords.value + newRecords
-            _hasMoreHistoryPages.value = hasMorePages
+            _hasMoreHistoryPages.value = hasMore
             onRecordsLoaded?.invoke()
         }
     }
 
-    override fun onRecordDetailLoaded(dataPoints: List<SensorDataPoint>) {
+    override fun onRecordDetailLoaded(recordId: String, dataPoints: List<SensorDataPoint>) {
         viewModelScope.launch {
             _selectedRecordData.value = dataPoints
             onRecordDetailLoaded?.invoke()
@@ -168,13 +176,5 @@ class HistoryRecordViewModel @Inject constructor(
 
     override fun onError(message: String) {
         onError?.invoke(message)
-    }
-
-    override fun onLoadingStateChanged(isLoading: Boolean) {
-        _isHistoryLoading.value = isLoading
-    }
-
-    override fun onDetailLoadingStateChanged(isLoading: Boolean) {
-        _isRecordDetailLoading.value = isLoading
     }
 }

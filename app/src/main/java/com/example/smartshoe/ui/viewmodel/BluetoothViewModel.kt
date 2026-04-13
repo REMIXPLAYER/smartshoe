@@ -1,6 +1,7 @@
 package com.example.smartshoe.ui.viewmodel
 
 import android.bluetooth.BluetoothDevice
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartshoe.data.manager.BluetoothConnectionManager
@@ -18,8 +19,13 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class BluetoothViewModel @Inject constructor(
+    val savedStateHandle: SavedStateHandle,
     private val bluetoothConnectionManager: BluetoothConnectionManager
 ) : ViewModel() {
+
+    companion object {
+        private const val KEY_ERROR_CALLBACK_SET = "error_callback_set"
+    }
 
     // 扫描到的设备列表 - 从 Manager 转发
     val scannedDevices: StateFlow<List<BluetoothDevice>> = bluetoothConnectionManager.scannedDevices
@@ -31,9 +37,14 @@ class BluetoothViewModel @Inject constructor(
     val isScanning: StateFlow<Boolean> = bluetoothConnectionManager.isScanning
 
     init {
-        // 将 Manager 的错误转发到 ViewModel
-        bluetoothConnectionManager.onError = { message ->
-            // 可以通过 StateFlow 或其他方式暴露给 UI
+        // 使用SavedStateHandle避免配置变更时重复设置回调
+        val isCallbackSet = savedStateHandle.get<Boolean>(KEY_ERROR_CALLBACK_SET) ?: false
+        if (!isCallbackSet) {
+            // 将 Manager 的错误转发到 ViewModel
+            bluetoothConnectionManager.onError = { message ->
+                // 可以通过 StateFlow 或其他方式暴露给 UI
+            }
+            savedStateHandle[KEY_ERROR_CALLBACK_SET] = true
         }
     }
 
@@ -49,6 +60,11 @@ class BluetoothViewModel @Inject constructor(
      * 停止扫描
      * 由 Manager 自动管理，此方法保留向后兼容
      */
+    @Deprecated(
+        "扫描状态由 BluetoothConnectionManager 自动管理，无需手动调用",
+        ReplaceWith(""),
+        DeprecationLevel.WARNING
+    )
     fun stopScan() {
         // Manager 会自动处理扫描状态
     }

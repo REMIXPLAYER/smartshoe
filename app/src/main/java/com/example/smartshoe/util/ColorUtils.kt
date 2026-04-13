@@ -2,6 +2,7 @@ package com.example.smartshoe.util
 
 import androidx.compose.ui.graphics.Color
 import com.example.smartshoe.config.AppConfig
+import com.example.smartshoe.domain.model.PressureStatus
 import kotlin.math.pow
 
 /**
@@ -188,14 +189,4 @@ object ColorUtils {
         return getPressureStatusFromValue(value).description
     }
 
-}
-
-/**
- * 压力状态枚举
- */
-enum class PressureStatus(val description: String) {
-    NONE("无压力"),
-    NORMAL("正常"),
-    HIGH("偏高"),
-    CRITICAL("过高")
 }

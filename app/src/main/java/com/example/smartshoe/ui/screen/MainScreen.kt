@@ -8,6 +8,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,14 +26,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartshoe.R
-import com.example.smartshoe.data.model.SensorDataPoint
-import com.example.smartshoe.data.model.UserState
+import com.example.smartshoe.domain.model.SensorDataPoint
+import com.example.smartshoe.domain.model.SensorDataRecord
+import com.example.smartshoe.domain.model.UserState
 import com.example.smartshoe.ui.component.BottomNavigation.BottomNavigationBar
 import com.example.smartshoe.ui.component.ExpandableArrowIcon
 import com.example.smartshoe.ui.component.getDeviceDisplayName
 import com.example.smartshoe.ui.component.sensor.SensorCanvas.InsoleWithSensors
 import com.example.smartshoe.ui.screen.DataRecordScreen.DataRecordScreen
 import com.example.smartshoe.ui.screen.SettingScreen.SettingsScreen
+import com.example.smartshoe.ui.viewmodel.AiAssistantViewModel
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppDimensions
 import com.example.smartshoe.ui.theme.AppTypography
@@ -50,7 +53,7 @@ data class MainScreenState(
     val scannedDevices: List<BluetoothDevice> = emptyList(),
     val sensorColors: List<Color> = emptyList(),
     val extraValues: List<Int> = emptyList(),
-    val pressureStatuses: List<com.example.smartshoe.util.PressureStatus> = emptyList(),
+    val pressureStatuses: List<com.example.smartshoe.domain.model.PressureStatus> = emptyList(),
     val historicalData: List<SensorDataPoint> = emptyList(),
     val connectedDevice: BluetoothDevice? = null,
     val userWeight: Float = 0f,
@@ -64,8 +67,8 @@ data class MainScreenState(
     val showAlertDialog: Boolean = false,
     val alertMessage: String = "",
     // 历史记录
-    val historyRecords: List<com.example.smartshoe.data.model.SensorDataRecord> = emptyList(),
-    val selectedHistoryRecord: com.example.smartshoe.data.model.SensorDataRecord? = null,
+    val historyRecords: List<SensorDataRecord> = emptyList(),
+    val selectedHistoryRecord: SensorDataRecord? = null,
     val recordData: List<SensorDataPoint> = emptyList(),
     val isHistoryLoading: Boolean = false,
     val isRecordDetailLoading: Boolean = false,
@@ -103,7 +106,7 @@ data class MainScreenCallbacks(
     val onBackupData: (Boolean, String, (Boolean) -> Unit) -> Unit = { _, _, _ -> },
     // 历史记录
     val onQueryHistory: () -> Unit = {},
-    val onRecordSelect: (com.example.smartshoe.data.model.SensorDataRecord?) -> Unit = {},
+    val onRecordSelect: (SensorDataRecord?) -> Unit = {},
     val onStartDateChange: (Date?) -> Unit = {},
     val onEndDateChange: (Date?) -> Unit = {},
     val onShowDatePicker: ((Date, (Date) -> Unit) -> Unit)? = null,
@@ -113,8 +116,13 @@ data class MainScreenCallbacks(
     val onGenerateMockData: () -> Unit = {},
     // SettingViewModel
     val settingViewModel: SettingViewModel? = null,
+    // AI助手
+    val aiAssistantViewModel: AiAssistantViewModel? = null,
+    val userToken: String = "",
     // 错误提示
-    val onShowError: ((String) -> Unit)? = null
+    val onShowError: ((String) -> Unit)? = null,
+    // AI分析 - 从历史记录页面跳转
+    val onAiAnalysisClick: ((String) -> Unit)? = null
 )
 
 /**
@@ -142,7 +150,10 @@ fun MainScreen(
                 title = { Text("压力异常警告") },
                 text = { Text(state.alertMessage) },
                 confirmButton = {
-                    TextButton(onClick = callbacks.onDismissAlert) {
+                    TextButton(
+                        onClick = callbacks.onDismissAlert,
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
+                    ) {
                         Text("确定")
                     }
                 }
@@ -236,12 +247,24 @@ private fun MainAppScreen(
                         onEndDateChange = callbacks.onEndDateChange,
                         onQueryClick = callbacks.onQueryHistory,
                         onRecordSelect = callbacks.onRecordSelect,
+                        onAiAnalysisClick = callbacks.onAiAnalysisClick,
                         queryExecuted = state.queryExecuted,
                         onShowDatePicker = callbacks.onShowDatePicker
                     )
                 }
 
-                3 -> { // 设置页面
+                3 -> { // AI助手页面
+                    callbacks.aiAssistantViewModel?.let { viewModel ->
+                        AiAssistantScreen(
+                            modifier = Modifier.padding(innerPadding),
+                            viewModel = viewModel,
+                            token = callbacks.userToken,
+                            onShowError = callbacks.onShowError ?: {}
+                        )
+                    }
+                }
+
+                4 -> { // 设置页面
                     Log.d("BackupDebug", "MainScreen: 传递 onBackupData=${callbacks.onBackupData}")
                     SettingsScreen(
                         modifier = Modifier.padding(innerPadding),
@@ -304,7 +327,7 @@ private fun MainContent(
     scannedDevices: List<BluetoothDevice>,
     sensorColors: List<Color>,
     extraValues: List<Int>,
-    pressureStatuses: List<com.example.smartshoe.util.PressureStatus> = emptyList(),
+    pressureStatuses: List<com.example.smartshoe.domain.model.PressureStatus> = emptyList(),
     onScanDevices: () -> Unit,
     connectedDevice: BluetoothDevice?,
     onConnectDevice: (BluetoothDevice) -> Unit,
@@ -390,7 +413,10 @@ fun ExpandableDeviceListSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp)
-                    .clickable { isExpanded = !isExpanded }
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) { isExpanded = !isExpanded }
             ) {
                 Row(
                     modifier = Modifier
@@ -423,7 +449,7 @@ fun ExpandableDeviceListSection(
                             Text(
                                 text = "已连接：${getDeviceDisplayName(connectedDevice)}",
                                 fontSize = 12.sp,
-                                color = Color(0xFF4CAF50)
+                                color = AppColors.Success
                             )
                         }
                     }
@@ -436,7 +462,8 @@ fun ExpandableDeviceListSection(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppColors.Primary
                         ),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
                     ) {
                         Text(
                             text = "扫描",
@@ -530,7 +557,7 @@ fun CompactDeviceListItem(
             ) {
                 Text(
                     text = getDeviceDisplayName(device),
-                    color = if (isConnected) Color(0xFF2E7D32) else AppColors.OnSurface,
+                    color = if (isConnected) AppColors.Success else AppColors.OnSurface,
                     fontSize = 16.sp,
                     fontWeight = if (isConnected) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
@@ -560,8 +587,9 @@ fun CompactDeviceListItem(
                     .height(36.dp)
                     .width(80.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isConnected) Color(0xFFF44336) else AppColors.Primary
-                )
+                    containerColor = if (isConnected) AppColors.Error else AppColors.Primary
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
             ) {
                 Text(
                     text = if (isConnected) "断开" else "连接",

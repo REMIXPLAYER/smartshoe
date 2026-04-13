@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -13,11 +15,11 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartshoe.R
+import com.example.smartshoe.ui.theme.AppColors
 
 /**
  * 底部导航栏组件
@@ -33,8 +35,8 @@ object BottomNavigation {
         onTabSelected: (Int) -> Unit
     ) {
         NavigationBar(
-            containerColor = Color.White,
-            contentColor = Color(0xFF3949AB),
+            containerColor = AppColors.Background,
+            contentColor = AppColors.Primary,
             modifier = Modifier.height(85.dp),
             tonalElevation = 8.dp
         ) {
@@ -56,11 +58,11 @@ object BottomNavigation {
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White, // 选中时图标白色
-                    selectedTextColor = Color(0xFF666666), // 选中时文字灰色
-                    unselectedIconColor = Color(0xFF666666), // 未选中时图标灰色
-                    unselectedTextColor = Color(0xFF666666), // 未选中时文字灰色
-                    indicatorColor = Color(0xFF3949AB) // 选中指示器颜色（深蓝色）
+                    selectedIconColor = AppColors.OnPrimary, // 选中时图标白色
+                    selectedTextColor = AppColors.MediumGray, // 选中时文字灰色
+                    unselectedIconColor = AppColors.MediumGray, // 未选中时图标灰色
+                    unselectedTextColor = AppColors.MediumGray, // 未选中时文字灰色
+                    indicatorColor = AppColors.Primary // 选中指示器颜色（深蓝色）
                 )
             )
 
@@ -81,11 +83,11 @@ object BottomNavigation {
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color(0xFF666666),
-                    unselectedIconColor = Color(0xFF666666),
-                    unselectedTextColor = Color(0xFF666666),
-                    indicatorColor = Color(0xFF3949AB)
+                    selectedIconColor = AppColors.OnPrimary,
+                    selectedTextColor = AppColors.MediumGray,
+                    unselectedIconColor = AppColors.MediumGray,
+                    unselectedTextColor = AppColors.MediumGray,
+                    indicatorColor = AppColors.Primary
                 )
             )
 
@@ -106,18 +108,43 @@ object BottomNavigation {
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color(0xFF666666),
-                    unselectedIconColor = Color(0xFF666666),
-                    unselectedTextColor = Color(0xFF666666),
-                    indicatorColor = Color(0xFF3949AB)
+                    selectedIconColor = AppColors.OnPrimary,
+                    selectedTextColor = AppColors.MediumGray,
+                    unselectedIconColor = AppColors.MediumGray,
+                    unselectedTextColor = AppColors.MediumGray,
+                    indicatorColor = AppColors.Primary
+                )
+            )
+
+            // AI助手标签
+            NavigationBarItem(
+                selected = selectedTab == 3,
+                onClick = { onTabSelected(3) },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = "AI助手"
+                    )
+                },
+                label = {
+                    Text(
+                        "AI助手",
+                        fontSize = 12.sp
+                    )
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = AppColors.OnPrimary,
+                    selectedTextColor = AppColors.MediumGray,
+                    unselectedIconColor = AppColors.MediumGray,
+                    unselectedTextColor = AppColors.MediumGray,
+                    indicatorColor = AppColors.Primary
                 )
             )
 
             // 设置标签
             NavigationBarItem(
-                selected = selectedTab == 3,
-                onClick = { onTabSelected(3) },
+                selected = selectedTab == 4,
+                onClick = { onTabSelected(4) },
                 icon = {
                     Icon(
                         imageVector = Icons.Filled.Settings,
@@ -131,11 +158,11 @@ object BottomNavigation {
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color(0xFF666666),
-                    unselectedIconColor = Color(0xFF666666),
-                    unselectedTextColor = Color(0xFF666666),
-                    indicatorColor = Color(0xFF3949AB)
+                    selectedIconColor = AppColors.OnPrimary,
+                    selectedTextColor = AppColors.MediumGray,
+                    unselectedIconColor = AppColors.MediumGray,
+                    unselectedTextColor = AppColors.MediumGray,
+                    indicatorColor = AppColors.Primary
                 )
             )
         }

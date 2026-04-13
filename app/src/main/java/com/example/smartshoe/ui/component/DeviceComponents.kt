@@ -25,7 +25,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,7 +55,7 @@ fun DeviceListHeader(
 
     val subtitleColor = remember(connectedDevice?.address) {
         if (connectedDevice != null && connectedDevice.address != null)
-            Color(0xFF4CAF50) else Color.Gray
+            AppColors.Success else AppColors.DarkGray
     }
 
     Row(
@@ -90,7 +89,7 @@ fun DeviceListHeader(
 
         ExpandableArrowIcon(
             isExpanded = isExpanded,
-            tint = Color.Gray,
+            tint = AppColors.DarkGray,
             size = 20.dp,
             useGraphicsLayer = false
         )
@@ -113,7 +112,7 @@ fun DeviceListContent(
             Text(
                 "未找到设备，请在主页点击扫描",
                 fontSize = 12.sp,
-                color = Color.Gray,
+                color = AppColors.DarkGray,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp),
@@ -163,15 +162,15 @@ fun DeviceSettingItem(
     onDisconnect: () -> Unit
 ) {
     val containerColor = remember(isConnected) {
-        if (isConnected) Color(0xFFE8F5E8) else Color.White
+        if (isConnected) AppColors.HealthAdviceCard else AppColors.Background
     }
 
     val iconTint = remember(isConnected) {
-        if (isConnected) Color(0xFF4CAF50) else AppColors.Primary
+        if (isConnected) AppColors.Success else AppColors.Primary
     }
 
     val textColor = remember(isConnected) {
-        if (isConnected) Color(0xFF2E7D32) else AppColors.OnSurface
+        if (isConnected) AppColors.Success else AppColors.OnSurface
     }
 
     val buttonText = remember(isConnected) {
@@ -179,13 +178,14 @@ fun DeviceSettingItem(
     }
 
     val buttonColor = remember(isConnected) {
-        if (isConnected) Color(0xFFF44336) else AppColors.Primary
+        if (isConnected) AppColors.Error else AppColors.Primary
     }
 
     val buttonWidth = remember(isConnected) {
         if (isConnected) 70.dp else 60.dp
     }
 
+    @SuppressLint("MissingPermission")
     val deviceName = remember(device.name, device.address) {
         getDeviceDisplayName(device)
     }
@@ -223,7 +223,7 @@ fun DeviceSettingItem(
                 Text(
                     text = deviceAddress,
                     fontSize = 10.sp,
-                    color = Color.Gray
+                    color = AppColors.DarkGray
                 )
             }
 
@@ -246,7 +246,7 @@ fun DeviceSettingItem(
                 Text(
                     text = buttonText,
                     fontSize = 12.sp,
-                    color = Color.White
+                    color = AppColors.OnPrimary
                 )
             }
         }

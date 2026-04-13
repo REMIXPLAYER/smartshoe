@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.smartshoe"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -116,4 +116,11 @@ dependencies {
 
     // Hilt ViewModel 支持
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+
+    // OkHttp SSE 支持
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
+
+    // Markdown 渲染支持
+    implementation("com.github.jeziellago:compose-markdown:0.5.0")
 }

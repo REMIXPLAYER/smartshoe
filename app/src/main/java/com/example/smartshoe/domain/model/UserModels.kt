@@ -1,8 +1,8 @@
-package com.example.smartshoe.data.model
+package com.example.smartshoe.domain.model
 
 /**
  * 用户状态数据类
- * 纯数据类，不包含UI框架依赖
+ * 纯数据类，不包含 UI 框架依赖
  */
 data class UserState(
     val isLoggedIn: Boolean = false,

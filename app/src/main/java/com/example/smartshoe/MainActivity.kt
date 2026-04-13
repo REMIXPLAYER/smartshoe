@@ -19,6 +19,7 @@ import javax.inject.Inject
 import com.example.smartshoe.data.manager.BluetoothConnectionManager
 import com.example.smartshoe.data.manager.CacheManager
 import com.example.smartshoe.data.manager.PerformanceMonitor
+import com.example.smartshoe.ui.viewmodel.AiAssistantViewModel
 import com.example.smartshoe.ui.viewmodel.AuthViewModel
 import com.example.smartshoe.ui.viewmodel.BluetoothViewModel
 import com.example.smartshoe.ui.viewmodel.HistoryRecordViewModel
@@ -48,6 +49,7 @@ class MainActivity : ComponentActivity() {
     private val userProfileViewModel: UserProfileViewModel by viewModels()
     private val mainViewModel: MainViewModel by viewModels()
     private val settingViewModel: SettingViewModel by viewModels()
+    private val aiAssistantViewModel: AiAssistantViewModel by viewModels()
     // 通过 Hilt 注入蓝牙连接管理器
     @Inject
     lateinit var bluetoothConnectionManager: BluetoothConnectionManager
@@ -58,22 +60,11 @@ class MainActivity : ComponentActivity() {
     // 压力提醒冷却时间
     private var lastAlertTime = 0L
 
-    // 通过Hilt注入管理器
-    // 重构：移除不必要的Manager注入，通过ViewModel访问
-    // @Inject lateinit var authRepository: AuthRepository
-    // @Inject lateinit var sensorDataManager: SensorDataManager
-    // memoryLeakDetector已从Application获取，不再在这里注入
-    // @Inject lateinit var memoryLeakDetector: MemoryLeakDetector
-    // @Inject lateinit var bluetoothResourceManager: BluetoothResourceManager
     @Inject
     lateinit var performanceMonitor: PerformanceMonitor
 
-    // 缓存管理器
     @Inject
     lateinit var cacheManager: CacheManager
-
-    // localDataSource不再直接访问，通过Manager/Repository访问
-    // @Inject lateinit var localDataSource: LocalDataSource
 
     private companion object {
         // 应用级组件初始化标志
@@ -232,9 +223,19 @@ class MainActivity : ComponentActivity() {
                 },
                 // SettingViewModel
                 settingViewModel = settingViewModel,
+                // AI助手
+                aiAssistantViewModel = aiAssistantViewModel,
+                userToken = authViewModel.tokenState.value ?: "",
                 // 错误提示
                 onShowError = { message ->
                     Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+                },
+                // AI分析 - 从历史记录页面跳转
+                onAiAnalysisClick = { recordId ->
+                    // 切换到AI助手页面
+                    mainViewModel.selectTab(3)
+                    // 触发分析
+                    aiAssistantViewModel?.analyzeRecord(recordId, authViewModel.tokenState.value ?: "")
                 }
             )
 

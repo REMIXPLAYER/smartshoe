@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Info
@@ -46,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
@@ -74,7 +74,7 @@ fun ExpandableArrowIcon(
     isExpanded: Boolean,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
-    tint: Color = Color.Gray,
+    tint: Color = AppColors.DarkGray,
     size: Dp = 20.dp,
     rotationDegrees: Float = 90f,
     useGraphicsLayer: Boolean = false
@@ -163,14 +163,14 @@ fun ExpandableHeader(
             Text(
                 text = subtitle,
                 fontSize = 14.sp,
-                color = Color.Gray
+                color = AppColors.DarkGray
             )
         }
 
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = if (isExpanded) "收起" else "展开",
-            tint = Color.Gray,
+            tint = AppColors.DarkGray,
             modifier = Modifier
                 .size(20.dp)
                 .rotate(arrowRotation)

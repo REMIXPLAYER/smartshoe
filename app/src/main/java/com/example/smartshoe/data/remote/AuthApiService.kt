@@ -1,6 +1,7 @@
 package com.example.smartshoe.data.remote
 
-import com.example.smartshoe.data.model.UserState
+import com.example.smartshoe.domain.model.UserState
+import okhttp3.OkHttpClient
 import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -55,10 +56,17 @@ interface AuthApiService {
 
 /**
  * 认证API服务实现
- * 使用 @Singleton 和 @Inject 支持 Hilt 依赖注入
+ * 使用共享的OkHttpClient实例
  */
 @Singleton
-class AuthApiServiceImpl @Inject constructor() : AuthApiService, BaseApiService() {
+class AuthApiServiceImpl @Inject constructor(
+    private val client: OkHttpClient
+) : AuthApiService, BaseApiService() {
+
+    /**
+     * 获取共享的OkHttpClient
+     */
+    override fun getOkHttpClient(): OkHttpClient = client
 
     companion object {
         private const val LOGIN_PATH = "/auth/login"
