@@ -295,6 +295,9 @@ class MainActivity : ComponentActivity() {
             // 清空历史记录数据
             historyRecordViewModel.clearHistoryData()
 
+            // 清空AI助手消息
+            aiAssistantViewModel.clearMessages()
+
             // 清空蓝牙设备列表并断开连接
             bluetoothViewModel.clearDevices()
             bluetoothViewModel.disconnectDevice()
