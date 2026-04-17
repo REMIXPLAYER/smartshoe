@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.util.Log
 import com.example.smartshoe.config.AppConfig
+import com.example.smartshoe.di.ApplicationScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,14 +22,14 @@ import javax.inject.Singleton
  * 负责蓝牙设备的扫描、连接、数据监听
  * 
  * 遵循 Clean Architecture 原则，将蓝牙连接逻辑从 Activity 中分离
+ * 使用 @ApplicationScope 确保协程作用域在应用生命周期内有效
  */
 @Singleton
 class BluetoothConnectionManager @Inject constructor(
     private val bluetoothAdapter: BluetoothAdapter?,
-    private val resourceManager: BluetoothResourceManager
+    private val resourceManager: BluetoothResourceManager,
+    @ApplicationScope private val connectionScope: CoroutineScope
 ) {
-
-    private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * 检查蓝牙权限
@@ -92,11 +93,32 @@ class BluetoothConnectionManager @Inject constructor(
         }
     }
 
+    // 连接操作锁，防止并发连接
+    private val connectionLock = Any()
+    private var isConnecting = false
+
     /**
      * 连接蓝牙设备
+     * 添加超时处理和并发控制
      */
     @SuppressLint("MissingPermission")
     suspend fun connectDevice(device: BluetoothDevice): Boolean = withContext(Dispatchers.IO) {
+        // 检查蓝牙适配器状态
+        if (bluetoothAdapter?.isEnabled != true) {
+            onError?.invoke("蓝牙未开启")
+            return@withContext false
+        }
+
+        // 防止并发连接
+        synchronized(connectionLock) {
+            if (isConnecting) {
+                Log.w(TAG, "Already connecting to a device, please wait")
+                onError?.invoke("正在连接其他设备，请稍候")
+                return@withContext false
+            }
+            isConnecting = true
+        }
+
         try {
             // 断开当前连接
             disconnectDevice()
@@ -104,8 +126,38 @@ class BluetoothConnectionManager @Inject constructor(
             // 创建 Socket
             val socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
 
-            // 连接
-            socket.connect()
+            // 连接（带超时）
+            val connectJob = launch {
+                try {
+                    socket.connect()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Socket connect error: ${e.message}")
+                    throw e
+                }
+            }
+
+            // 等待连接完成或超时（10秒）
+            val connectResult = withTimeoutOrNull(10000) {
+                connectJob.join()
+                true
+            }
+
+            if (connectResult == null) {
+                // 连接超时
+                connectJob.cancel()
+                closeSocketSafely(socket)
+                Log.e(TAG, "Connection timeout")
+                onError?.invoke("连接超时，请重试")
+                return@withContext false
+            }
+
+            // 检查连接是否成功
+            if (!socket.isConnected) {
+                closeSocketSafely(socket)
+                Log.e(TAG, "Socket not connected after connect()")
+                onError?.invoke("连接失败")
+                return@withContext false
+            }
 
             // 注册到资源管理器
             resourceManager.registerSocket(device.address, socket)
@@ -122,6 +174,21 @@ class BluetoothConnectionManager @Inject constructor(
             Log.e(TAG, "Error connecting to device: ${e.message}")
             onError?.invoke("连接失败: ${e.message}")
             false
+        } finally {
+            synchronized(connectionLock) {
+                isConnecting = false
+            }
+        }
+    }
+
+    /**
+     * 安全关闭Socket
+     */
+    private fun closeSocketSafely(socket: BluetoothSocket?) {
+        try {
+            socket?.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error closing socket: ${e.message}")
         }
     }
 
@@ -138,6 +205,7 @@ class BluetoothConnectionManager @Inject constructor(
 
     /**
      * 开始监听蓝牙数据
+     * 优化：正确处理协程取消，避免取消时触发错误回调
      */
     private fun startDataListening(deviceAddress: String, socket: BluetoothSocket) {
         val job = connectionScope.launch {
@@ -156,16 +224,26 @@ class BluetoothConnectionManager @Inject constructor(
                             onDataReceived?.invoke(data)
                         }
                     } catch (e: Exception) {
-                        if (isActive) {
-                            Log.e(TAG, "Error reading data: ${e.message}")
-                            onError?.invoke("数据读取错误: ${e.message}")
+                        // 检查协程是否仍然活跃，避免取消时触发错误
+                        if (!isActive) {
+                            Log.d(TAG, "Data listening cancelled for device: $deviceAddress")
+                            break
                         }
+                        Log.e(TAG, "Error reading data: ${e.message}")
+                        onError?.invoke("数据读取错误: ${e.message}")
                         break
                     }
                 }
             } catch (e: Exception) {
+                // 检查协程是否仍然活跃，避免取消时触发错误
+                if (!isActive) {
+                    Log.d(TAG, "Data listening cancelled for device: $deviceAddress")
+                    return@launch
+                }
                 Log.e(TAG, "Error in data listening: ${e.message}")
                 onError?.invoke("数据监听错误: ${e.message}")
+            } finally {
+                Log.d(TAG, "Data listening ended for device: $deviceAddress")
             }
         }
 
@@ -181,10 +259,23 @@ class BluetoothConnectionManager @Inject constructor(
 
     /**
      * 释放所有资源
+     * 注意：不清除 connectionScope，因为它是应用级别的协程作用域
+     * 只清理当前连接相关的资源和回调
      */
     fun releaseAllResources() {
+        // 清理回调，防止内存泄漏
+        onDataReceived = null
+        onError = null
+        
+        // 断开当前连接
         disconnectDevice()
+        
+        // 释放资源管理器中的所有资源
         resourceManager.releaseAllResources()
-        connectionScope.cancel()
+        
+        // 注意：不取消 connectionScope，因为它是应用级别的
+        // 由 Hilt 管理的 @ApplicationScope 协程作用域会在应用结束时自动清理
+        
+        Log.d(TAG, "All resources released (connection scope preserved)")
     }
 }

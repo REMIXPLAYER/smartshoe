@@ -81,7 +81,7 @@ object DataRecordScreen {
                                 modifier = Modifier
                                     .size(10.dp)
                                     .background(
-                                        color = if (connectedDevice != null) AppColors.Success else AppColors.DarkGray,
+                                        color = if (connectedDevice != null) AppColors.Primary else AppColors.DarkGray,
                                         shape = CircleShape
                                     )
                             )
@@ -94,7 +94,7 @@ object DataRecordScreen {
                                     "设备未连接"
                                 },
                                 fontSize = 14.sp,
-                                color = if (connectedDevice != null) AppColors.Success else AppColors.DarkGray,
+                                color = if (connectedDevice != null) AppColors.Primary else AppColors.DarkGray,
                                 fontWeight = FontWeight.Medium
                             )
                         }

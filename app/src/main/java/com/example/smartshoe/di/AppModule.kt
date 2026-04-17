@@ -18,9 +18,20 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+/**
+ * 应用级协程作用域限定符
+ */
+@Qualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class ApplicationScope
 
 /**
  * 应用级依赖注入模块
@@ -40,6 +51,17 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideContext(@ApplicationContext context: Context): Context = context
+
+        /**
+         * 提供应用级协程作用域
+         * 用于需要在应用生命周期内运行的后台任务
+         */
+        @Provides
+        @Singleton
+        @ApplicationScope
+        fun provideApplicationScope(): CoroutineScope {
+            return CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        }
 
         /**
          * 提供蓝牙适配器

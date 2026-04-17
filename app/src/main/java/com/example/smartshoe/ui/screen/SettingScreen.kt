@@ -72,7 +72,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.smartshoe.R
 import com.example.smartshoe.domain.model.UserState
-import com.example.smartshoe.ui.component.DeviceSettingItem
+import com.example.smartshoe.ui.component.CompactDeviceListItem
 import com.example.smartshoe.ui.component.ExpandableArrowIcon
 import com.example.smartshoe.ui.component.SmartShoeTextField
 import com.example.smartshoe.ui.component.VersionDetailItem
@@ -217,7 +217,7 @@ object SettingScreen {
                     icon = R.drawable.bluetooth,
                     label = "设备状态",
                     value = if (isConnected) "已连接" else "未连接",
-                    indicatorColor = if (isConnected) AppColors.Success else AppColors.DarkGray,
+                    indicatorColor = if (isConnected) AppColors.Primary else AppColors.DarkGray,
                     isActive = isConnected
                 )
                 
@@ -239,7 +239,7 @@ object SettingScreen {
                 // 备份状态
                 val (backupText, backupColor) = when (uploadStatus) {
                     UploadStatus.UPLOADING -> "上传中" to AppColors.Primary
-                    UploadStatus.SUCCESS -> "已备份" to AppColors.Success
+                    UploadStatus.SUCCESS -> "已备份" to AppColors.Primary
                     UploadStatus.FAILED -> "失败" to AppColors.Error
                     else -> "未备份" to AppColors.DarkGray
                 }
@@ -407,10 +407,10 @@ object SettingScreen {
                                     text = "已连接设备",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = AppColors.Success
+                                    color = AppColors.Primary
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                DeviceSettingItem(
+                                CompactDeviceListItem(
                                     device = device,
                                     isConnected = true,
                                     onConnect = {},
@@ -429,7 +429,7 @@ object SettingScreen {
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 scannedDevices.forEach { device ->
-                                    DeviceSettingItem(
+                                    CompactDeviceListItem(
                                         device = device,
                                         isConnected = false,
                                         onConnect = { onConnectDevice(device) },
@@ -506,7 +506,7 @@ object SettingScreen {
                                     Icon(
                                         painter = painterResource(R.drawable.check),
                                         contentDescription = "确认",
-                                        tint = AppColors.Success,
+                                        tint = AppColors.Primary,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
@@ -625,7 +625,7 @@ object SettingScreen {
                                     },
                                     fontSize = 12.sp,
                                     color = when (uploadStatus) {
-                                        UploadStatus.SUCCESS -> AppColors.Success
+                                        UploadStatus.SUCCESS -> AppColors.Primary
                                         UploadStatus.FAILED -> AppColors.Error
                                         else -> AppColors.DarkGray
                                     }

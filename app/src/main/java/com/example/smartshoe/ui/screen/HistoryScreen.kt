@@ -65,13 +65,13 @@ object HistoryScreen {
             modifier = modifier
                 .fillMaxSize()
                 .background(AppColors.Background)
-                .padding(16.dp)
         ) {
             // 主内容区域（时间选择器和记录列表）- 始终显示在底层
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .padding(16.dp)  // 将 padding 移到 Column，避免裁剪 Card 阴影
             ) {
                 DateTimeSelector(
                     startDate = startDate,
@@ -159,7 +159,8 @@ object HistoryScreen {
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
+            colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
+            shape = RoundedCornerShape(12.dp)  // 添加圆角，与首页蓝牙卡片保持一致
         ) {
             Column(
                 modifier = Modifier.padding(16.dp)
@@ -431,7 +432,8 @@ object HistoryScreen {
                 .fillMaxWidth()
                 .fillMaxHeight(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
+            colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
+            shape = RoundedCornerShape(12.dp)  // 添加圆角，与首页蓝牙卡片保持一致
         ) {
             Column(
                 modifier = Modifier

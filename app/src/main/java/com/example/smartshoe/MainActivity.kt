@@ -148,6 +148,8 @@ class MainActivity : ComponentActivity() {
                 historicalData = sensorDataViewModel.historicalData.collectAsStateWithLifecycle().value,
                 connectedDevice = bluetoothViewModel.connectedDevice.collectAsStateWithLifecycle().value,
                 userWeight = userProfileViewModel.userWeight.collectAsStateWithLifecycle().value,
+                // 蓝牙扫描状态
+                isScanning = bluetoothViewModel.isScanning.collectAsStateWithLifecycle().value,
                 // 用户认证
                 userState = authViewModel.userState.collectAsStateWithLifecycle().value,
                 isLoggedIn = authViewModel.userState.collectAsStateWithLifecycle().value.isLoggedIn,
@@ -370,27 +372,28 @@ class MainActivity : ComponentActivity() {
      * 确保所有资源被正确释放，防止内存泄漏
      */
     override fun onDestroy() {
-        super.onDestroy()
+        // 1. 先停止内存泄漏检测，避免误报
+        (application as? SmartShoeApplication)?.getMemoryLeakDetector()?.unwatch(this, "Activity")
 
-        // 1. 断开蓝牙连接
-        bluetoothViewModel.disconnectDevice()
+        // 2. 释放蓝牙连接管理器的所有资源
+        if (::bluetoothConnectionManager.isInitialized) {
+            bluetoothConnectionManager.releaseAllResources()
+        }
 
-        // 2. 清空数据缓冲区，释放内存
-        // ViewModel 会自动处理生命周期，不需要手动清理
-        // 但我们可以清空数据
+        // 3. 清空数据缓冲区，释放内存
         sensorDataViewModel.clearSensorData()
         historyRecordViewModel.clearHistoryData()
         bluetoothViewModel.clearDevices()
-
-        // 3. 停止内存泄漏检测（从Application获取）
-        (application as? SmartShoeApplication)?.getMemoryLeakDetector()?.unwatch(this, "Activity")
 
         // 4. 停止性能监控
         if (::performanceMonitor.isInitialized) {
             performanceMonitor.stopMonitoring()
         }
 
-        // 5. 建议系统进行垃圾回收
+        // 5. 调用父类方法
+        super.onDestroy()
+
+        // 6. 建议系统进行垃圾回收
         System.gc()
     }
 }

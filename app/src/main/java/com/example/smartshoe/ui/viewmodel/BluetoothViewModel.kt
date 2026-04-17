@@ -97,7 +97,11 @@ class BluetoothViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        // 清理资源
+        // 清理回调，防止内存泄漏
         bluetoothConnectionManager.onError = null
+        bluetoothConnectionManager.onDataReceived = null
+        
+        // 断开蓝牙连接，释放资源
+        disconnectDevice()
     }
 }

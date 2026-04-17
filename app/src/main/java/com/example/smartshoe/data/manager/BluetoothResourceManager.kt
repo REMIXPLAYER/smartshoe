@@ -4,10 +4,11 @@ import android.bluetooth.BluetoothSocket
 import android.util.Log
 import kotlinx.coroutines.*
 import java.io.InputStream
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
+
 
 /**
  * 蓝牙资源管理器
@@ -22,11 +23,7 @@ class BluetoothResourceManager @Inject constructor() {
     private val activeSockets = ConcurrentHashMap<String, BluetoothSocket>()
     private val activeStreams = ConcurrentHashMap<String, InputStream>()
     private val activeJobs = ConcurrentHashMap<String, Job>()
-    private val isReleased = AtomicBoolean(false)
     private val resourceLock = Any()
-
-    // 协程作用域用于资源清理
-    private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         private const val TAG = "BluetoothResourceMgr"
@@ -37,12 +34,6 @@ class BluetoothResourceManager @Inject constructor() {
      */
     fun registerSocket(deviceAddress: String, socket: BluetoothSocket) {
         synchronized(resourceLock) {
-            if (isReleased.get()) {
-                Log.w(TAG, "Cannot register socket, manager is released")
-                closeSocketSafely(socket)
-                return
-            }
-
             // 关闭同一设备的旧连接
             activeSockets[deviceAddress]?.let { oldSocket ->
                 Log.d(TAG, "Closing old socket for device: $deviceAddress")
@@ -59,12 +50,6 @@ class BluetoothResourceManager @Inject constructor() {
      */
     fun registerInputStream(deviceAddress: String, inputStream: InputStream) {
         synchronized(resourceLock) {
-            if (isReleased.get()) {
-                Log.w(TAG, "Cannot register stream, manager is released")
-                closeStreamSafely(inputStream)
-                return
-            }
-
             activeStreams[deviceAddress] = inputStream
             Log.d(TAG, "InputStream registered for device: $deviceAddress")
         }
@@ -75,12 +60,6 @@ class BluetoothResourceManager @Inject constructor() {
      */
     fun registerJob(deviceAddress: String, job: Job) {
         synchronized(resourceLock) {
-            if (isReleased.get()) {
-                Log.w(TAG, "Cannot register job, manager is released")
-                job.cancel()
-                return
-            }
-
             // 取消同一设备的旧任务
             activeJobs[deviceAddress]?.let { oldJob ->
                 if (oldJob.isActive) {
@@ -149,13 +128,11 @@ class BluetoothResourceManager @Inject constructor() {
 
     /**
      * 释放所有资源
+     * 注意：此方法只清理当前活动的资源，不会阻止后续使用
+     * 资源管理器可以在释放后继续注册新的资源
      */
     fun releaseAllResources() {
         synchronized(resourceLock) {
-            if (isReleased.getAndSet(true)) {
-                return
-            }
-
             Log.d(TAG, "Releasing all bluetooth resources")
 
             // 取消所有协程任务
@@ -178,10 +155,9 @@ class BluetoothResourceManager @Inject constructor() {
             }
             activeSockets.clear()
 
-            // 取消清理协程作用域
-            cleanupScope.cancel()
+            // 注意：不取消 cleanupScope，以便后续可以继续使用资源管理器
 
-            Log.d(TAG, "All bluetooth resources released")
+            Log.d(TAG, "All bluetooth resources released (manager still active)")
         }
     }
 
@@ -211,20 +187,8 @@ class BluetoothResourceManager @Inject constructor() {
         return ResourceStats(
             activeSockets = activeSockets.size,
             activeStreams = activeStreams.size,
-            activeJobs = activeJobs.size,
-            isReleased = isReleased.get()
+            activeJobs = activeJobs.size
         )
-    }
-
-    /**
-     * 异步清理过期资源
-     */
-    fun cleanupStaleResources(maxIdleTimeMs: Long = 30000) {
-        cleanupScope.launch {
-            val currentTime = System.currentTimeMillis()
-            // 这里可以添加基于时间的资源清理逻辑
-            // 例如：关闭长时间空闲的连接
-        }
     }
 
     /**
@@ -233,8 +197,7 @@ class BluetoothResourceManager @Inject constructor() {
     data class ResourceStats(
         val activeSockets: Int,
         val activeStreams: Int,
-        val activeJobs: Int,
-        val isReleased: Boolean
+        val activeJobs: Int
     ) {
         fun getTotalResources(): Int = activeSockets + activeStreams + activeJobs
     }

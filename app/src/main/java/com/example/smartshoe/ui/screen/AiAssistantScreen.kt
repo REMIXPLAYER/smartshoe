@@ -47,6 +47,7 @@ import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.domain.model.HealthAdviceSummary
 import com.example.smartshoe.domain.model.SensorDataRecord
 import com.example.smartshoe.ui.theme.AppColors
+import com.example.smartshoe.ui.theme.AppDimensions
 import com.example.smartshoe.ui.viewmodel.AiAssistantViewModel
 import com.example.smartshoe.ui.viewmodel.ChatMessage
 import com.example.smartshoe.util.DateTimeUtils
@@ -206,12 +207,12 @@ fun AiAssistantScreen(
                     .fillMaxSize()
                     .verticalScroll(scrollState)
                     .padding(paddingValues)  // 先应用 Scaffold 的 padding
-                    .padding(horizontal = 16.dp)  // 再应用水平 padding
+                    .padding(horizontal = AppDimensions.DefaultPadding)  // 与首页保持一致的左右边距
                     .padding(bottom = 80.dp),  // 为底部输入栏预留空间
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // 为悬浮的模式选择器预留空间
-                Spacer(modifier = Modifier.height(72.dp))
+                // 为悬浮的模式选择器预留空间（与首页蓝牙卡片位置一致，使用 DefaultPadding）
+                Spacer(modifier = Modifier.height(76.dp))
 
                 // 消息列表
                 messages.forEach { message ->
@@ -221,7 +222,7 @@ fun AiAssistantScreen(
                 Spacer(modifier = Modifier.height(100.dp))  // 底部额外空间，确保最后一条消息可见
             }
 
-            // 悬浮的AI模式选择器 - 展开时悬浮在消息之上，不挤压内容
+            // 悬浮的AI模式选择器 - 与首页蓝牙卡片保持一致的padding
             AiModeSelectorTopBar(
                 enableThinking = enableThinking,
                 isExpanded = isModeMenuExpanded,
@@ -232,7 +233,8 @@ fun AiAssistantScreen(
                 },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 8.dp)
+                    .padding(horizontal = 16.dp)  // 与首页蓝牙卡片外部padding一致
+                    .padding(top = AppDimensions.DefaultPadding)  // 与首页蓝牙卡片顶部padding一致
             )
 
             // 加载指示器
@@ -346,31 +348,30 @@ private fun AiModeSelectorTopBar(
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(AppConfig.AiAssistant.MODE_CORNER_RADIUS.dp)
+        shape = RoundedCornerShape(12.dp)  // 与首页蓝牙卡片保持一致
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(
-                    min = 48.dp,
-                    max = if (isExpanded) 280.dp else 48.dp  // 增加高度以完整显示内容
+                    min = 60.dp,
+                    max = if (isExpanded) 280.dp else 60.dp  // 与首页蓝牙卡片高度一致
                 )
         ) {
             // 标题栏 - 点击展开/收起
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(60.dp)  // 与首页蓝牙卡片高度一致
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
                         onClick = onExpandToggle
                     )
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 16.dp),  // 与首页蓝牙卡片内部padding一致
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
@@ -405,13 +406,6 @@ private fun AiModeSelectorTopBar(
                         .padding(horizontal = 16.dp)
                         .padding(bottom = 16.dp)
                 ) {
-                    Text(
-                        text = "选择模式",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = AppColors.OnSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
 
                     ModeOptionItem(
                         title = "快速响应",
