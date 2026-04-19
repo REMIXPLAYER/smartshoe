@@ -46,6 +46,21 @@ class SettingViewModel @Inject constructor(
     private val _isLoginLoading = MutableStateFlow(false)
     val isLoginLoading: StateFlow<Boolean> = _isLoginLoading.asStateFlow()
 
+    // 登录错误状态（统一处理所有登录错误）
+    private val _loginError = MutableStateFlow<String?>(null)
+    val loginError: StateFlow<String?> = _loginError.asStateFlow()
+
+    // 登录错误字段标记（用于高亮显示错误的输入框）
+    private val _loginErrorField = MutableStateFlow<LoginErrorField?>(null)
+    val loginErrorField: StateFlow<LoginErrorField?> = _loginErrorField.asStateFlow()
+
+    /**
+     * 登录错误字段类型
+     */
+    enum class LoginErrorField {
+        EMAIL, PASSWORD, BOTH
+    }
+
     // ==================== 注册对话框状态 ====================
     private val _showRegisterDialog = MutableStateFlow(false)
     val showRegisterDialog: StateFlow<Boolean> = _showRegisterDialog.asStateFlow()
@@ -129,10 +144,14 @@ class SettingViewModel @Inject constructor(
 
     fun onLoginEmailChange(email: String) {
         _loginEmail.value = email
+        // 输入时清除错误状态
+        clearLoginError()
     }
 
     fun onLoginPasswordChange(password: String) {
         _loginPassword.value = password
+        // 输入时清除错误状态
+        clearLoginError()
     }
 
     fun onLoginPasswordVisibilityChange(visible: Boolean) {
@@ -140,14 +159,21 @@ class SettingViewModel @Inject constructor(
     }
 
     /**
-     * 验证登录表单
-     * @return 错误信息，如果验证通过返回 null
+     * 设置登录错误
+     * @param message 错误消息，null 表示清除错误
+     * @param field 错误关联的字段
      */
-    fun validateLoginForm(): String? {
-        return when {
-            _loginEmail.value.isBlank() || _loginPassword.value.isBlank() -> "请输入邮箱和密码"
-            else -> null
-        }
+    fun setLoginError(message: String?, field: LoginErrorField? = null) {
+        _loginError.value = message
+        _loginErrorField.value = field
+    }
+
+    /**
+     * 清除登录错误
+     */
+    fun clearLoginError() {
+        _loginError.value = null
+        _loginErrorField.value = null
     }
 
     fun resetLoginForm() {
@@ -155,6 +181,7 @@ class SettingViewModel @Inject constructor(
         _loginPassword.value = ""
         _loginPasswordVisible.value = false
         _isLoginLoading.value = false
+        clearLoginError()  // 清除错误状态
     }
 
     // ==================== 注册相关方法 ====================

@@ -51,4 +51,8 @@ object AppColors {
     val LightGray = Color(0xFFEEEEEE)            // 浅灰色（分隔线等）
     val MediumGray = Color(0xFF666666)           // 中灰色（次要文字）
     val DarkGray = Color.Gray                    // 深灰色
+
+    // AI模式颜色（方案B：蓝紫对比）
+    val AiModeDeep = Color(0xFF7C4DFF)           // 深度思考模式 - 明亮紫
+    val AiModeQuick = Color(0xFF3949AB)          // 快速响应模式 - 深蓝
 }

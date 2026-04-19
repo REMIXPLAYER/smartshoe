@@ -46,7 +46,7 @@ object BottomNavigation {
                 onClick = { onTabSelected(0) },
                 icon = {
                     Icon(
-                        imageVector = Icons.Filled.Home, // 主页图标
+                        painter = painterResource(R.drawable.icon_foot), // 主页图标 - 使用foot图标
                         contentDescription = "主页",
                         modifier = Modifier.size(24.dp) // 设置图标大小
                     )
@@ -122,7 +122,7 @@ object BottomNavigation {
                 onClick = { onTabSelected(3) },
                 icon = {
                     Icon(
-                        imageVector = Icons.Filled.Person,
+                        painter = painterResource(R.drawable.aizhineng),
                         contentDescription = "AI助手"
                     )
                 },

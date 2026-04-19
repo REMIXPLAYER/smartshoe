@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.lang.ref.WeakReference
 import java.util.Collections
 import javax.inject.Inject
@@ -75,6 +77,9 @@ class AiAssistantViewModel @Inject constructor(
     // 当前SSE任务，用于取消
     private var currentSseJob: Job? = null
 
+    // Mutex 用于保护消息列表的并发修改，防止竞态条件
+    private val messagesMutex = Mutex()
+
     // 错误回调 - 使用WeakReference避免内存泄漏
     private var onErrorRef: WeakReference<((String) -> Unit)>? = null
     
@@ -120,10 +125,10 @@ class AiAssistantViewModel @Inject constructor(
         // 取消之前的请求
         currentSseJob?.cancel()
 
-        // 添加用户消息
-        addMessage(ChatMessage.User(message))
-
         currentSseJob = viewModelScope.launch {
+            // 添加用户消息
+            addMessage(ChatMessage.User(message))
+
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             // 创建流式AI消息
@@ -208,61 +213,98 @@ class AiAssistantViewModel @Inject constructor(
 
     /**
      * 取消当前SSE请求
+     * 修复：使用 Mutex 防止竞态条件，确保消息列表操作的原子性
      */
     fun cancelCurrentRequest() {
+        // 1. 取消协程任务
         currentSseJob?.cancel()
         currentSseJob = null
+
+        // 2. 重置UI状态
         _uiState.value = _uiState.value.copy(isLoading = false)
         _connectionState.value = SseConnectionState.Idle
+
+        // 3. 使用 Mutex 保护消息列表的修改，防止竞态条件
+        viewModelScope.launch {
+            messagesMutex.withLock {
+                val currentMessages = _messages.value
+                val lastMsg = currentMessages.lastOrNull()
+
+                if (lastMsg is ChatMessage.StreamingAi) {
+                    if (lastMsg.content.isNotEmpty()) {
+                        // 将未完成的流式消息转换为普通消息（带取消标记）
+                        val newList = currentMessages.toMutableList().apply {
+                            removeAt(size - 1)
+                            add(ChatMessage.Ai(
+                                content = lastMsg.content + "\n\n[已停止生成]",
+                                model = lastMsg.model,
+                                generationTimeMs = 0
+                            ))
+                        }
+                        _messages.value = newList
+                    } else {
+                        // 如果没有生成任何内容，移除空的流式消息
+                        _messages.value = currentMessages.dropLast(1)
+                    }
+                }
+            }
+        }
     }
 
     /**
      * 更新最后一条消息（用于流式更新）
-     * 优化：避免频繁创建新列表
+     * 优化：使用 Mutex 保护，避免竞态条件
      */
-    private fun updateLastMessage(message: ChatMessage) {
-        val currentList = _messages.value
-        if (currentList.isNotEmpty()) {
-            // 使用构建列表的方式，避免不必要的复制
-            val newList = currentList.toMutableList().apply {
-                this[size - 1] = message
+    private suspend fun updateLastMessage(message: ChatMessage) {
+        messagesMutex.withLock {
+            val currentList = _messages.value
+            if (currentList.isNotEmpty()) {
+                val newList = currentList.toMutableList().apply {
+                    this[size - 1] = message
+                }
+                _messages.value = newList
             }
-            _messages.value = newList
         }
     }
 
     /**
      * 替换最后一条消息
+     * 优化：使用 Mutex 保护，避免竞态条件
      */
-    private fun replaceLastMessage(message: ChatMessage) {
-        val currentList = _messages.value
-        if (currentList.isNotEmpty()) {
-            val newList = currentList.toMutableList().apply {
-                removeAt(size - 1)
-                add(message)
+    private suspend fun replaceLastMessage(message: ChatMessage) {
+        messagesMutex.withLock {
+            val currentList = _messages.value
+            if (currentList.isNotEmpty()) {
+                val newList = currentList.toMutableList().apply {
+                    removeAt(size - 1)
+                    add(message)
+                }
+                _messages.value = newList
             }
-            _messages.value = newList
         }
     }
 
     /**
      * 初始化欢迎消息（在ViewModel init中调用）
      * 使用SavedStateHandle确保配置变化后不会重复添加
+     * 使用 Mutex 保护消息列表操作
      */
     private fun initWelcomeMessage() {
         // 检查是否已经初始化过（使用SavedStateHandle持久化）
         val isWelcomeInitialized = savedStateHandle.get<Boolean>(KEY_WELCOME_INITIALIZED) ?: false
-        
+
         if (!isWelcomeInitialized && _messages.value.isEmpty()) {
-            addMessage(ChatMessage.Ai(
-                "👋 您好！我是您的足部健康AI助手。\n\n" +
-                "我可以通过分析您的智能鞋垫传感器数据，为您提供：\n" +
-                "• 📊 足部压力分布分析\n" +
-                "• ⚠️ 异常步态检测\n" +
-                "• 💡 个性化健康建议\n\n" +
-                "请直接输入您的问题，或前往历史记录页面选择数据获取健康建议。",
-                "AI助手"
-            ))
+            viewModelScope.launch {
+                addMessage(ChatMessage.Ai(
+                    "👋 您好！我是您的足部健康AI助手。\n\n" +
+                    "我可以通过分析您的智能鞋垫传感器数据，为您提供：\n" +
+                    "• 📊 足部压力分布分析\n" +
+                    "• ⚠️ 异常步态检测\n" +
+                    "• 💡 个性化健康建议\n\n" +
+                    "请直接输入您的问题，或前往历史记录页面选择数据获取健康建议。",
+                    "AI助手"
+                ))
+            }
             // 标记已初始化
             savedStateHandle[KEY_WELCOME_INITIALIZED] = true
         }
@@ -310,16 +352,19 @@ class AiAssistantViewModel @Inject constructor(
      * 添加消息到列表
      * 限制最大消息数，防止内存无限增长
      * 策略：保留第一条欢迎消息，移除最旧的用户/AI消息
+     * 使用 Mutex 保护，避免竞态条件
      */
-    private fun addMessage(message: ChatMessage) {
-        val currentList = _messages.value
-        val newList = if (currentList.size >= AppConfig.AiAssistant.MAX_MESSAGE_COUNT) {
-            // 保留第一条欢迎消息，移除第二条（最旧的用户/AI消息）
-            listOf(currentList[0]) + currentList.drop(2).takeLast(AppConfig.AiAssistant.MAX_MESSAGE_COUNT - 2) + message
-        } else {
-            currentList + message
+    private suspend fun addMessage(message: ChatMessage) {
+        messagesMutex.withLock {
+            val currentList = _messages.value
+            val newList = if (currentList.size >= AppConfig.AiAssistant.MAX_MESSAGE_COUNT) {
+                // 保留第一条欢迎消息，移除第二条（最旧的用户/AI消息）
+                listOf(currentList[0]) + currentList.drop(2).takeLast(AppConfig.AiAssistant.MAX_MESSAGE_COUNT - 2) + message
+            } else {
+                currentList + message
+            }
+            _messages.value = newList
         }
-        _messages.value = newList
     }
 
     /**

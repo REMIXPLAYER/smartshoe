@@ -1005,6 +1005,8 @@ object SettingScreen {
         val password = viewModel?.loginPassword?.collectAsStateWithLifecycle()?.value ?: ""
         val passwordVisible = viewModel?.loginPasswordVisible?.collectAsStateWithLifecycle()?.value ?: false
         val isLoading = viewModel?.isLoginLoading?.collectAsStateWithLifecycle()?.value ?: false
+        val loginError = viewModel?.loginError?.collectAsStateWithLifecycle()?.value
+        val loginErrorField = viewModel?.loginErrorField?.collectAsStateWithLifecycle()?.value
         val scrollState = rememberScrollState()
 
         Dialog(
@@ -1041,7 +1043,12 @@ object SettingScreen {
                         onValueChange = { viewModel?.onLoginEmailChange(it) },
                         label = "邮箱地址",
                         modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = Icons.Default.Email
+                        leadingIcon = Icons.Default.Email,
+                        isError = loginError != null && 
+                            (loginErrorField == SettingViewModel.LoginErrorField.EMAIL || 
+                             loginErrorField == SettingViewModel.LoginErrorField.BOTH),
+                        errorMessage = if (loginErrorField == SettingViewModel.LoginErrorField.EMAIL || 
+                                          loginErrorField == SettingViewModel.LoginErrorField.BOTH) loginError else null
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     SmartShoeTextField.Password(
@@ -1053,8 +1060,23 @@ object SettingScreen {
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = Icons.Default.Lock,
                         visibilityIcon = painterResource(R.drawable.visibility),
-                        visibilityOffIcon = painterResource(R.drawable.visibility_off)
+                        visibilityOffIcon = painterResource(R.drawable.visibility_off),
+                        isError = loginError != null && 
+                            (loginErrorField == SettingViewModel.LoginErrorField.PASSWORD || 
+                             loginErrorField == SettingViewModel.LoginErrorField.BOTH),
+                        errorMessage = if (loginErrorField == SettingViewModel.LoginErrorField.PASSWORD || 
+                                          loginErrorField == SettingViewModel.LoginErrorField.BOTH) loginError else null
                     )
+                    // 显示全局错误提示（当错误不关联特定字段时）
+                    if (loginError != null && loginErrorField == null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = loginError,
+                            fontSize = 14.sp,
+                            color = AppColors.Error,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Spacer(modifier = Modifier.height(20.dp))
                     Button(
                         onClick = { onLogin(email, password) },
@@ -1460,12 +1482,68 @@ object SettingScreen {
         LaunchedEffect(authUiState) {
             when (authUiState) {
                 is AuthUiState.Success -> settingViewModel?.handleAuthCompleted(success = true)
-                is AuthUiState.Error -> settingViewModel?.handleAuthCompleted(success = false)
+                is AuthUiState.Error -> {
+                    val errorMessage = (authUiState as AuthUiState.Error).message
+                    // 根据 HTTP 状态码和错误消息统一处理登录错误
+                    // 错误格式可能是 "[401] 登录失败" 或纯文本消息
+                    val httpCodeRegex = Regex("\\[(\\d+)]")
+                    val httpCode = httpCodeRegex.find(errorMessage)?.groupValues?.get(1)?.toIntOrNull()
+                    val cleanMessage = errorMessage.replace(httpCodeRegex, "").trim()
+                    
+                    when {
+                        // HTTP 401 - 未授权（账号或密码错误）
+                        httpCode == 401 -> {
+                            settingViewModel?.setLoginError(
+                                message = "邮箱或密码错误",
+                                field = SettingViewModel.LoginErrorField.BOTH
+                            )
+                        }
+                        // HTTP 403 - 禁止访问（账户被禁用）
+                        httpCode == 403 -> {
+                            settingViewModel?.setLoginError(
+                                message = "账户已被禁用",
+                                field = SettingViewModel.LoginErrorField.BOTH
+                            )
+                        }
+                        // HTTP 4xx - 客户端错误（请求格式问题等）
+                        httpCode != null && httpCode in 400..499 -> {
+                            settingViewModel?.setLoginError(
+                                message = cleanMessage.ifEmpty { "请求参数错误" },
+                                field = SettingViewModel.LoginErrorField.BOTH
+                            )
+                        }
+                        // HTTP 5xx - 服务器错误
+                        httpCode != null && httpCode in 500..599 -> {
+                            settingViewModel?.setLoginError(
+                                message = "服务器错误，请稍后重试",
+                                field = null
+                            )
+                        }
+                        // 网络连接错误
+                        cleanMessage.contains("连接", ignoreCase = true) ||
+                        cleanMessage.contains("网络", ignoreCase = true) ||
+                        cleanMessage.contains("timeout", ignoreCase = true) ||
+                        cleanMessage.contains("无法连接", ignoreCase = true) -> {
+                            settingViewModel?.setLoginError(
+                                message = "网络连接失败，请检查网络设置",
+                                field = null
+                            )
+                        }
+                        // 其他未知错误
+                        else -> {
+                            settingViewModel?.setLoginError(
+                                message = cleanMessage.ifEmpty { "登录失败，请重试" },
+                                field = null
+                            )
+                        }
+                    }
+                    settingViewModel?.handleAuthCompleted(success = false)
+                }
                 else -> {}
             }
         }
 
-        // 显示错误
+        // 显示全局错误（使用 Snackbar 等，不使用 Toast）
         errorMessage?.let { message ->
             onShowError?.invoke(message)
             settingViewModel?.clearError()
@@ -1560,10 +1638,7 @@ object SettingScreen {
             LoginDialog(
                 onDismiss = { settingViewModel?.hideLoginDialog() },
                 onLogin = { email, password ->
-                    settingViewModel?.validateLoginForm()?.let { error ->
-                        settingViewModel?.showError(error)
-                        return@LoginDialog
-                    }
+                    // 移除前端验证，直接调用后端
                     settingViewModel?.setLoginLoading(true)
                     onLogin(email, password)
                 },

@@ -1,8 +1,10 @@
 package com.example.smartshoe.ui.screen
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -65,13 +67,13 @@ object HistoryScreen {
             modifier = modifier
                 .fillMaxSize()
                 .background(AppColors.Background)
+                .padding(16.dp)
         ) {
             // 主内容区域（时间选择器和记录列表）- 始终显示在底层
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp)  // 将 padding 移到 Column，避免裁剪 Card 阴影
             ) {
                 DateTimeSelector(
                     startDate = startDate,
@@ -107,13 +109,36 @@ object HistoryScreen {
             }
 
             // 记录详情页面 - 从右侧滑入滑出
-            AnimatedVisibility(
-                visible = selectedRecord != null,
-                enter = slideInHorizontally(initialOffsetX = { it }), // 从右侧进入
-                exit = slideOutHorizontally(targetOffsetX = { it }),   // 向右侧退出
-                modifier = Modifier.fillMaxSize()
-            ) {
-                if (selectedRecord != null) {
+            // 使用 AnimatedContent 替代 AnimatedVisibility 以支持平滑的内容切换动画
+            androidx.compose.animation.AnimatedContent(
+                targetState = selectedRecord,
+                transitionSpec = {
+                    if (targetState != null) {
+                        // 进入动画：从右侧滑入
+                        slideInHorizontally(
+                            initialOffsetX = { it },
+                            animationSpec = tween(durationMillis = 300)
+                        ) togetherWith
+                        slideOutHorizontally(
+                            targetOffsetX = { it },
+                            animationSpec = tween(durationMillis = 300)
+                        )
+                    } else {
+                        // 退出动画：向右侧滑出
+                        slideInHorizontally(
+                            initialOffsetX = { it },
+                            animationSpec = tween(durationMillis = 300)
+                        ) togetherWith
+                        slideOutHorizontally(
+                            targetOffsetX = { it },
+                            animationSpec = tween(durationMillis = 300)
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "record_detail_animation"
+            ) { targetRecord ->
+                if (targetRecord != null) {
                     if (isRecordDetailLoading) {
                         // 记录详情加载中
                         Box(
@@ -128,12 +153,15 @@ object HistoryScreen {
                         // 无论recordData是否为空，都显示详情页面
                         // 如果数据为空，图表区域会显示"暂无数据"
                         SelectedRecordDetail(
-                            record = selectedRecord,
+                            record = targetRecord,
                             data = recordData,
                             onBackClick = { onRecordSelect(null) },
                             onAiAnalysisClick = onAiAnalysisClick
                         )
                     }
+                } else {
+                    // 当没有选中记录时显示空内容（用于退出动画）
+                    Box(modifier = Modifier.fillMaxSize())
                 }
             }
         }

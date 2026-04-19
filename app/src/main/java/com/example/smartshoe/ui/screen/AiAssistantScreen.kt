@@ -1,5 +1,6 @@
 package com.example.smartshoe.ui.screen
 
+import com.example.smartshoe.R
 import dev.jeziellago.compose.markdowntext.MarkdownText
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
@@ -39,6 +40,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.domain.model.HealthAdviceSummary
 import com.example.smartshoe.domain.model.SensorDataRecord
+import com.example.smartshoe.ui.component.ExpandableChevron
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppDimensions
 import com.example.smartshoe.ui.viewmodel.AiAssistantViewModel
@@ -191,6 +194,7 @@ fun AiAssistantScreen(
                     showHistoryBottomSheet = true
                     viewModel.loadHistoryRecords(token)
                 },
+                onCancel = { viewModel.cancelCurrentRequest() },  // 取消AI生成
                 isLoading = uiState.isLoading
             )
         }
@@ -334,6 +338,7 @@ private fun ScrollToBottomButton(
 
 /**
  * AI模式选择器 - 悬浮设计，展开时覆盖消息内容
+ * 样式与蓝牙设备管理器保持一致（方案A：现代简洁风）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -347,50 +352,86 @@ private fun AiModeSelectorTopBar(
     val interactionSource = remember { MutableInteractionSource() }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(12.dp)  // 与首页蓝牙卡片保持一致
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(
                     min = 60.dp,
-                    max = if (isExpanded) 280.dp else 60.dp  // 与首页蓝牙卡片高度一致
+                    max = if (isExpanded) 280.dp else 60.dp
                 )
         ) {
-            // 标题栏 - 点击展开/收起
+            // 标题栏 - 统一60.dp高度，与蓝牙卡片保持一致
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp)  // 与首页蓝牙卡片高度一致
+                    .height(60.dp)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
                         onClick = onExpandToggle
                     )
-                    .padding(horizontal = 16.dp),  // 与首页蓝牙卡片内部padding一致
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // AI图标 - 使用 minds 图标
+                Icon(
+                    painter = painterResource(R.drawable.minds),
+                    contentDescription = "AI模式",
+                    tint = AppColors.Primary,
+                    modifier = Modifier.size(24.dp)
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // 主标题 - 统一16.sp SemiBold Primary色
                 Text(
-                    text = if (enableThinking) "AI 深度思考" else "AI 快速响应",
+                    text = "AI 模式",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = AppColors.Primary
+                    color = AppColors.Primary,
+                    modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "收起" else "展开",
-                    tint = AppColors.Primary.copy(alpha = 0.7f),
-                    modifier = Modifier.size(20.dp)
-                )
+
+                // 右侧：当前模式标签 + 展开图标
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 当前模式标签 - 使用方案B：蓝紫对比
+                    val modeLabel = if (enableThinking) "深度思考" else "快速响应"
+                    val modeColor = if (enableThinking)
+                        AppColors.AiModeDeep      // 明亮紫 - 深度思考
+                    else
+                        AppColors.AiModeQuick     // 深蓝 - 快速响应
+
+                    Surface(
+                        color = modeColor.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = modeLabel,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = modeColor,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    // 统一展开图标（使用ExpandableChevron）
+                    ExpandableChevron(
+                        isExpanded = isExpanded,
+                        size = 24.dp,
+                        tint = AppColors.OnSurface.copy(alpha = 0.6f)
+                    )
+                }
             }
 
-            // 展开列表 - 使用expandVertically与蓝牙设备列表保持一致
+            // 展开列表
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(
@@ -406,7 +447,6 @@ private fun AiModeSelectorTopBar(
                         .padding(horizontal = 16.dp)
                         .padding(bottom = 16.dp)
                 ) {
-
                     ModeOptionItem(
                         title = "快速响应",
                         subtitle = "快速生成回答，适合日常咨询",
@@ -1013,6 +1053,7 @@ private fun ChatInputBar(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     onHistoryClick: () -> Unit,
+    onCancel: () -> Unit,  // 取消AI生成回调
     isLoading: Boolean
 ) {
     Box(
@@ -1093,31 +1134,41 @@ private fun ChatInputBar(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // 发送按钮 - 使用普通Icon去除点击阴影
+                // 发送/停止按钮 - 使用普通Icon去除点击阴影
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .padding(8.dp)
                         .background(
-                            color = if (value.isNotBlank() && !isLoading)
+                            color = if (isLoading || value.isNotBlank())
                                 AppColors.Primary
                             else
                                 Color.Transparent,
                             shape = CircleShape
                         )
                         .clickable(
-                            enabled = value.isNotBlank() && !isLoading,
+                            enabled = isLoading || value.isNotBlank(),
                             indication = null,  // 去除点击阴影
                             interactionSource = remember { MutableInteractionSource() },
-                            onClick = onSend
+                            onClick = {
+                                if (isLoading) {
+                                    onCancel()  // 加载中点击 = 取消生成
+                                } else {
+                                    onSend()    // 非加载中点击 = 发送消息
+                                }
+                            }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = AppColors.Primary
+                        // 加载中显示方形停止图标
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(2.dp)
+                                )
                         )
                     } else {
                         Icon(
@@ -1127,7 +1178,7 @@ private fun ChatInputBar(
                                 Color.White
                             else
                                 AppColors.OnSurface.copy(alpha = 0.3f),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }

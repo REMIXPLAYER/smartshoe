@@ -90,12 +90,16 @@ fun DeviceListHeader(
                 "蓝牙设备管理",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                color = AppColors.OnSurface
+                color = AppColors.OnSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitleText,
                 fontSize = 14.sp,
-                color = subtitleColor
+                color = subtitleColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 

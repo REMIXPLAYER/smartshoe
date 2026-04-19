@@ -3,16 +3,10 @@ package com.example.smartshoe.ui.screen
 import android.bluetooth.BluetoothDevice
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -21,13 +15,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +33,8 @@ import com.example.smartshoe.domain.model.SensorDataRecord
 import com.example.smartshoe.domain.model.UserState
 import com.example.smartshoe.ui.component.BottomNavigation.BottomNavigationBar
 import com.example.smartshoe.ui.component.CompactDeviceListItem
-import com.example.smartshoe.ui.component.ExpandableArrowIcon
+import com.example.smartshoe.ui.component.ExpandableChevron
+import com.example.smartshoe.ui.component.RefreshButton
 import com.example.smartshoe.ui.component.getDeviceDisplayName
 import com.example.smartshoe.ui.component.sensor.SensorCanvas.InsoleWithSensors
 import com.example.smartshoe.ui.screen.DataRecordScreen.DataRecordScreen
@@ -399,7 +392,7 @@ private fun MainContent(
  * 设备列表区域组件
  * 显示扫描到的蓝牙设备列表，支持滚动查看，包含刷新按钮
  * 展开时悬浮在其他组件上方
- * 样式与 ModeOptionItem 保持一致
+ * 样式与 AI模式选择器 保持一致（方案A：现代简洁风）
  */
 @Composable
 fun ExpandableDeviceListSection(
@@ -412,18 +405,6 @@ fun ExpandableDeviceListSection(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-
-    // 刷新图标旋转动画 - 使用 rememberInfiniteTransition 实现更流畅的无限旋转
-    val infiniteTransition = rememberInfiniteTransition(label = "scanning")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "refresh_rotation"
-    )
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -439,11 +420,11 @@ fun ExpandableDeviceListSection(
                     max = if (isExpanded) 350.dp else 60.dp
                 )
         ) {
-            // 头部区域 - 保持白色背景
+            // 标题栏 - 统一60.dp高度，解决双行信息挤压问题
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(60.dp)
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -467,58 +448,64 @@ fun ExpandableDeviceListSection(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // 标题和副标题
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "蓝牙设备 (${devices.size})",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = AppColors.OnSurface
-                        )
+                    // 主标题 - 统一16.sp SemiBold Primary色
+                    Text(
+                        text = "蓝牙设备",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppColors.Primary,
+                        modifier = Modifier.weight(1f)
+                    )
 
+                    // 右侧区域：连接状态 + 刷新按钮 + 展开图标
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // 连接状态标签（单行显示，避免挤压主标题）
                         if (connectedDevice != null) {
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                // 状态指示点
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(AppColors.Success)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "已连接",
+                                    fontSize = 12.sp,
+                                    color = AppColors.Success,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        } else {
                             Text(
-                                text = getDeviceDisplayName(connectedDevice),
+                                text = "未连接",
                                 fontSize = 12.sp,
-                                color = AppColors.Primary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                color = AppColors.OnSurface.copy(alpha = 0.5f)
                             )
                         }
-                    }
 
-                    // 刷新按钮 - 带动画效果
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clickable(
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() },
-                                onClick = onScanDevices
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "扫描设备",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .rotate(if (isScanning) rotation else 0f),
-                            tint = if (isScanning) AppColors.Primary else AppColors.OnSurface.copy(alpha = 0.6f)
+                        // 刷新按钮 - 使用新的RefreshButton组件
+                        RefreshButton(
+                            isScanning = isScanning,
+                            onRefresh = onScanDevices,
+                            size = 32.dp,
+                            iconSize = 18.dp
+                        )
+
+                        // 统一展开图标（使用ExpandableChevron）
+                        ExpandableChevron(
+                            isExpanded = isExpanded,
+                            size = 24.dp,
+                            tint = AppColors.OnSurface.copy(alpha = 0.6f)
                         )
                     }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    ExpandableArrowIcon(
-                        isExpanded = isExpanded,
-                        size = 24.dp,
-                        useGraphicsLayer = false
-                    )
                 }
             }
 
@@ -535,20 +522,32 @@ fun ExpandableDeviceListSection(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (devices.isEmpty()) {
+                        // 空状态优化
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(80.dp),
+                                .height(100.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                "未找到设备，请点击刷新按钮",
-                                fontSize = 14.sp,
-                                color = AppColors.OnSurface.copy(alpha = 0.6f),
-                                textAlign = TextAlign.Center
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "未找到设备",
+                                    fontSize = 14.sp,
+                                    color = AppColors.OnSurface.copy(alpha = 0.5f)
+                                )
+                                Text(
+                                    text = "点击刷新按钮开始扫描",
+                                    fontSize = 12.sp,
+                                    color = AppColors.OnSurface.copy(alpha = 0.4f)
+                                )
+                            }
                         }
                     } else {
+                        // 已连接设备详情头部（展开后显示）
+                        if (connectedDevice != null) {
+                            ConnectedDeviceHeader(device = connectedDevice)
+                        }
+
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -562,13 +561,87 @@ fun ExpandableDeviceListSection(
                                     onConnect = { onConnectDevice(device) },
                                     onDisconnect = onDisconnectDevice
                                 )
-                                HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                                if (device != devices.last()) {
+                                    HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                                }
                             }
                         }
                     }
-
                 }
             }
         }
+    }
+}
+
+/**
+ * 已连接设备详情头部
+ * 展开蓝牙设备列表后显示，展示详细的连接设备信息
+ */
+@Composable
+private fun ConnectedDeviceHeader(device: BluetoothDevice) {
+    val displayName = getDeviceDisplayName(device)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        color = AppColors.Primary.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.bluetooth),
+                contentDescription = null,
+                tint = AppColors.Primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayName,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AppColors.OnSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = device.address ?: "未知地址",
+                    fontSize = 11.sp,
+                    color = AppColors.OnSurface.copy(alpha = 0.5f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            // 在线状态指示
+            ConnectedIndicator()
+        }
+    }
+}
+
+/**
+ * 连接状态指示器
+ */
+@Composable
+private fun ConnectedIndicator() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(AppColors.Success)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = "在线",
+            fontSize = 11.sp,
+            color = AppColors.Success,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
