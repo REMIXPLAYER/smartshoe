@@ -3,6 +3,7 @@ package com.example.smartshoe.ui.component
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -41,7 +42,7 @@ fun ExpandableChevron(
     )
 
     Icon(
-        imageVector = Icons.Default.KeyboardArrowRight,
+        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
         contentDescription = if (isExpanded) "收起" else "展开",
         modifier = modifier
             .rotate(rotation)

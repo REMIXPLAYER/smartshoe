@@ -2,6 +2,8 @@ package com.example.smartshoe.ui.screen
 
 import android.bluetooth.BluetoothDevice
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
@@ -75,14 +79,12 @@ import com.example.smartshoe.domain.model.UserState
 import com.example.smartshoe.ui.component.CompactDeviceListItem
 import com.example.smartshoe.ui.component.ExpandableArrowIcon
 import com.example.smartshoe.ui.component.SmartShoeTextField
-import com.example.smartshoe.ui.component.VersionDetailItem
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppIcon
 import com.example.smartshoe.ui.theme.AppIcons
 import com.example.smartshoe.ui.viewmodel.AuthUiState
 import com.example.smartshoe.ui.viewmodel.SettingViewModel
 import com.example.smartshoe.ui.viewmodel.UploadStatus
-import com.example.smartshoe.util.AnimationDefaults
 
 object SettingScreen {
 
@@ -733,7 +735,7 @@ object SettingScreen {
         }
     }
 
-    // ==================== 设置列表（复用AboutApp内容，整合在一个卡片内）====================
+    // ==================== 增强版设置列表（液态科技风格）====================
     @Composable
     fun SettingsList(
         isVersionExpanded: Boolean,
@@ -754,38 +756,19 @@ object SettingScreen {
             colors = CardDefaults.cardColors(containerColor = AppColors.Background),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 // 版本信息
                 AboutAppItem(
                     appIcon = AppIcons.Info,
                     title = "版本信息",
                     subtitle = "v1.0.0",
                     isExpanded = isVersionExpanded,
-                    onExpandedChange = onVersionExpandedChange,
-                    isLastItem = false
+                    onExpandedChange = onVersionExpandedChange
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        VersionDetailItem("应用名称", "举足凝健")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        VersionDetailItem("版本号", "v1.0.0")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        VersionDetailItem("构建日期", "2026年4月")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        VersionDetailItem("开发者", "SmartShoe Team")
-                    }
+                    VersionInfoContent()
                 }
 
-                // 分隔线
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = AppColors.LightGray
-                )
+                GradientDivider()
 
                 // 使用帮助
                 AboutAppItem(
@@ -793,39 +776,12 @@ object SettingScreen {
                     title = "使用帮助",
                     subtitle = "操作指南与常见问题",
                     isExpanded = isHelpExpanded,
-                    onExpandedChange = onHelpExpandedChange,
-                    isLastItem = false
+                    onExpandedChange = onHelpExpandedChange
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        Text(
-                            text = "使用指南:",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "1. 点击「设备」按钮扫描并连接智能鞋垫\n" +
-                                    "2. 连接成功后查看实时压力分布图\n" +
-                                    "3. 在「体重」中设置您的体重数据\n" +
-                                    "4. 开启「提醒」功能获得压力异常通知\n" +
-                                    "5. 使用「备份」功能将数据上传云端",
-                            fontSize = 13.sp,
-                            color = Color.DarkGray,
-                            lineHeight = 20.sp
-                        )
-                    }
+                    HelpGuideContent()
                 }
 
-                // 分隔线
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = AppColors.LightGray
-                )
+                GradientDivider()
 
                 // 隐私政策
                 AboutAppItem(
@@ -833,88 +789,30 @@ object SettingScreen {
                     title = "隐私政策",
                     subtitle = "查看隐私保护条款",
                     isExpanded = isPrivacyExpanded,
-                    onExpandedChange = onPrivacyExpandedChange,
-                    isLastItem = false
+                    onExpandedChange = onPrivacyExpandedChange
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        Text(
-                            text = "最后更新日期: 2026年4月",
-                            fontSize = 12.sp,
-                            color = AppColors.DarkGray
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "本应用尊重并保护您的隐私权。我们仅在必要时收集和使用您的个人信息，以提供和改进我们的服务。\n\n" +
-                                    "我们收集的信息包括蓝牙设备名称、传感器数据和连接状态，这些信息仅用于实时显示压力分布和生成历史数据图表。\n\n" +
-                                    "我们承诺不会与第三方共享您的个人数据，除非获得您的明确同意或法律要求。",
-                            fontSize = 13.sp,
-                            color = Color.DarkGray,
-                            lineHeight = 20.sp
-                        )
-                    }
+                    PrivacyPolicyContent()
                 }
 
-                // 分隔线
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = AppColors.LightGray
-                )
+                GradientDivider()
 
-                // 清除缓存
+                // 清除缓存（红色主题）
                 AboutAppItem(
                     appIcon = AppIcons.Delete,
                     title = "清除缓存",
                     subtitle = "清除应用本地数据",
                     isExpanded = isClearCacheExpanded,
                     onExpandedChange = onClearCacheExpandedChange,
-                    isLastItem = true
+                    iconBackground = AppColors.Error.copy(alpha = 0.1f),
+                    iconTint = AppColors.Error
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        Text(
-                            text = "清除缓存将删除以下数据：",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "• 用户登录信息\n• 蓝牙设备列表\n• 传感器历史数据\n• 体重设置\n• 临时文件",
-                            fontSize = 13.sp,
-                            color = Color.DarkGray,
-                            lineHeight = 20.sp
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = onClearCache,
-                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Error),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = "清除",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("确认清除缓存", color = AppColors.Background, fontSize = 14.sp)
-                        }
-                    }
+                    ClearCacheContent(onClearCache = onClearCache)
                 }
             }
         }
     }
 
+    // ==================== 增强版 AboutAppItem（与QuickActionButton风格一致）====================
     @Composable
     fun AboutAppItem(
         appIcon: AppIcon,
@@ -922,12 +820,12 @@ object SettingScreen {
         subtitle: String,
         isExpanded: Boolean,
         onExpandedChange: (Boolean) -> Unit,
-        isLastItem: Boolean,
+        isLastItem: Boolean = false,
+        iconBackground: Color = AppColors.Primary.copy(alpha = 0.1f),
+        iconTint: Color = AppColors.Primary,
         expandedContent: @Composable () -> Unit
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             // 标题行（可点击）
             Row(
                 modifier = Modifier
@@ -940,32 +838,44 @@ object SettingScreen {
                     .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 根据图标类型显示不同的图标
-                when (appIcon) {
-                    is AppIcon.MaterialIcon -> {
-                        Icon(
-                            imageVector = appIcon.icon,
-                            contentDescription = title,
-                            tint = AppColors.Primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    is AppIcon.ResourceIcon -> {
-                        Icon(
-                            painter = painterResource(id = appIcon.resId),
-                            contentDescription = title,
-                            tint = AppColors.Primary,
-                            modifier = Modifier.size(24.dp)
-                        )
+                // 图标容器 - 与QuickActionButton风格一致（纯色背景）
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(
+                            color = iconBackground,
+                            shape = RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (appIcon) {
+                        is AppIcon.MaterialIcon -> {
+                            Icon(
+                                imageVector = appIcon.icon,
+                                contentDescription = title,
+                                tint = iconTint,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        is AppIcon.ResourceIcon -> {
+                            Icon(
+                                painter = painterResource(id = appIcon.resId),
+                                contentDescription = title,
+                                tint = iconTint,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                
+                Spacer(modifier = Modifier.width(14.dp))
+                
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = AppColors.OnSurface
+                        fontWeight = if (isExpanded) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (isExpanded) AppColors.Primary else AppColors.OnSurface
                     )
                     Text(
                         text = subtitle,
@@ -973,26 +883,468 @@ object SettingScreen {
                         color = AppColors.DarkGray
                     )
                 }
+                
+                // 箭头动画（与ExpandableArrowIcon一致）
                 ExpandableArrowIcon(
                     isExpanded = isExpanded,
                     useGraphicsLayer = true
                 )
             }
 
-            // 展开内容
+            // 展开内容 - 带左侧强调线和交错动画
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(
-                    animationSpec = AnimationDefaults.expandTween
-                ) + fadeIn(animationSpec = AnimationDefaults.fadeInTween),
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(
+                    animationSpec = tween(200)
+                ),
                 exit = shrinkVertically(
-                    animationSpec = AnimationDefaults.shrinkTween
-                ) + fadeOut(animationSpec = AnimationDefaults.fadeOutTween)
+                    animationSpec = tween(250, easing = FastOutSlowInEasing)
+                ) + fadeOut(
+                    animationSpec = tween(150)
+                )
             ) {
-                expandedContent()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    expandedContent()
+                }
             }
         }
     }
+
+    // ==================== 辅助组件 ====================
+    /**
+     * 渐变分割线
+     */
+    @Composable
+    private fun GradientDivider() {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(1.dp)
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            AppColors.LightGray.copy(alpha = 0.6f),
+                            AppColors.LightGray.copy(alpha = 0.6f),
+                            Color.Transparent
+                        ),
+                        startX = 0f,
+                        endX = 1000f
+                    )
+                )
+        )
+    }
+
+    /**
+     * 交错动画内容容器 - 用于展开内容的逐行淡入效果
+     */
+    @Composable
+    private fun StaggeredColumn(
+        modifier: Modifier = Modifier,
+        verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(8.dp),
+        content: @Composable ColumnScope.() -> Unit
+    ) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = verticalArrangement
+        ) {
+            content()
+        }
+    }
+
+    // ==================== AboutAppSection 内容组件 ====================
+
+    /**
+     * 版本信息内容 - 卡片式信息展示
+     */
+    @Composable
+    private fun VersionInfoContent() {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // 应用信息卡片
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = AppColors.Primary.copy(alpha = 0.05f)),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    InfoRow(icon = R.drawable.icon_foot, label = "应用名称", value = "举足凝健")
+                    HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
+                    InfoRow(iconVector = Icons.Default.Info, label = "版本号", value = "v1.2.0")
+                    HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
+                    InfoRow(icon = R.drawable.update, label = "构建日期", value = "2026年4月")
+                    HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
+                    InfoRow(icon = R.drawable.man, label = "开发者", value = "SmartShoe Team")
+                }
+            }
+
+            // 版权信息
+            Text(
+                text = "© 2026 SmartShoe Team. All rights reserved.",
+                fontSize = 11.sp,
+                color = AppColors.DarkGray.copy(alpha = 0.7f),
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+        }
+    }
+
+    /**
+     * 信息行组件 - 带资源图标的键值对展示
+     */
+    @Composable
+    private fun InfoRow(icon: Int, label: String, value: String) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    tint = AppColors.Primary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    color = AppColors.DarkGray
+                )
+            }
+            Text(
+                text = value,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = AppColors.OnSurface
+            )
+        }
+    }
+
+    /**
+     * 信息行组件 - 带矢量图标的键值对展示
+     */
+    @Composable
+    private fun InfoRow(iconVector: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = iconVector,
+                    contentDescription = null,
+                    tint = AppColors.Primary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    color = AppColors.DarkGray
+                )
+            }
+            Text(
+                text = value,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = AppColors.OnSurface
+            )
+        }
+    }
+
+    /**
+     * 使用帮助内容 - 步骤式引导
+     */
+    @Composable
+    private fun HelpGuideContent() {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+
+            // 步骤列表
+            StepItem(number = 1, text = "点击「设备」按钮扫描并连接智能鞋垫")
+            Spacer(modifier = Modifier.height(12.dp))
+            StepItem(number = 2, text = "连接成功后查看实时压力分布图")
+            Spacer(modifier = Modifier.height(12.dp))
+            StepItem(number = 3, text = "在「体重」中设置您的体重数据")
+            Spacer(modifier = Modifier.height(12.dp))
+            StepItem(number = 4, text = "开启「提醒」功能获得压力异常通知")
+            Spacer(modifier = Modifier.height(12.dp))
+            StepItem(number = 5, text = "使用「备份」功能将数据上传云端")
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 提示卡片
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = AppColors.Success.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(10.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 图标容器 - 24dp与步骤数字圆圈大小一致，确保视觉对齐
+                    Box(
+                        modifier = Modifier.size(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = AppColors.Success,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "首次使用请确保蓝牙已开启，并将设备靠近手机",
+                        fontSize = 12.sp,
+                        color = AppColors.Success.copy(alpha = 0.9f),
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * 步骤项组件 - 带数字圆圈的步骤指示
+     */
+    @Composable
+    private fun StepItem(number: Int, text: String) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 数字圆圈 - 24dp大小，通过paddingLeft与外部44dp图标容器对齐
+            // 计算：外部图标容器44dp，圆圈24dp，需要 (44-24)/2 = 10dp 的padding
+            Box(
+                modifier = Modifier
+                    .padding(start = 10.dp)
+                    .size(24.dp)
+                    .background(AppColors.Primary.copy(alpha = 0.1f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = number.toString(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppColors.Primary
+                )
+            }
+            Spacer(modifier = Modifier.width(22.dp)) // 12dp + 10dp补偿padding
+            Text(
+                text = text,
+                fontSize = 13.sp,
+                color = AppColors.OnSurface,
+                lineHeight = 20.sp,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+
+    /**
+     * 隐私政策内容 - 分段式展示
+     */
+    @Composable
+    private fun PrivacyPolicyContent() {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 更新时间标签
+            Card(
+                colors = CardDefaults.cardColors(containerColor = AppColors.AiModeDeep.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Text(
+                    text = "最后更新：2026年4月",
+                    fontSize = 11.sp,
+                    color = AppColors.AiModeDeep,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+
+            // 隐私政策段落
+            PrivacySection(
+                title = "信息收集",
+                content = "我们仅在必要时收集和使用您的个人信息，以提供和改进我们的服务。"
+            )
+
+            PrivacySection(
+                title = "数据用途",
+                content = "我们收集的信息包括蓝牙设备名称、传感器数据和连接状态，这些信息仅用于实时显示压力分布和生成历史数据图表。"
+            )
+
+            PrivacySection(
+                title = "数据保护",
+                content = "我们承诺不会与第三方共享您的个人数据，除非获得您的明确同意或法律要求。"
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 联系信息
+            Text(
+                text = "如有疑问，请联系开发团队",
+                fontSize = 11.sp,
+                color = AppColors.DarkGray.copy(alpha = 0.7f)
+            )
+        }
+    }
+
+    /**
+     * 隐私政策段落组件
+     */
+    @Composable
+    private fun PrivacySection(title: String, content: String) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.OnSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = content,
+                fontSize = 12.sp,
+                color = AppColors.DarkGray,
+                lineHeight = 18.sp
+            )
+        }
+    }
+
+    /**
+     * 清除缓存内容 - 图标化列表展示
+     */
+    @Composable
+    private fun ClearCacheContent(onClearCache: () -> Unit) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 警告卡片
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = AppColors.Error.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(10.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = AppColors.Error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "清除缓存将删除以下数据，此操作不可恢复",
+                        fontSize = 12.sp,
+                        color = AppColors.Error.copy(alpha = 0.9f),
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
+            // 数据列表
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = AppColors.LightGray.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(10.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ClearCacheItem(icon = Icons.Default.Person, text = "用户登录信息")
+                    ClearCacheItem(icon = R.drawable.bluetooth, text = "蓝牙设备列表")
+                    ClearCacheItem(icon = R.drawable.history, text = "传感器历史数据")
+                    ClearCacheItem(icon = R.drawable.man, text = "体重设置")
+                    ClearCacheItem(icon = R.drawable.analytics, text = "临时文件")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 清除按钮
+            Button(
+                onClick = onClearCache,
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Error),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(10.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "清除",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("确认清除缓存", color = AppColors.Background, fontSize = 14.sp)
+            }
+        }
+    }
+
+    /**
+     * 清除缓存项组件
+     */
+    @Composable
+    private fun ClearCacheItem(icon: Any, text: String) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            when (icon) {
+                is Int -> {
+                    Icon(
+                        painter = painterResource(icon),
+                        contentDescription = null,
+                        tint = AppColors.DarkGray.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                else -> {
+                    Icon(
+                        imageVector = icon as androidx.compose.ui.graphics.vector.ImageVector,
+                        contentDescription = null,
+                        tint = AppColors.DarkGray.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = text,
+                fontSize = 13.sp,
+                color = AppColors.DarkGray
+            )
+        }
+    }
+
     // ==================== 登录/注册对话框（保持原有实现）====================
     @Composable
     private fun LoginDialog(
@@ -1546,7 +1898,7 @@ object SettingScreen {
         // 显示全局错误（使用 Snackbar 等，不使用 Toast）
         errorMessage?.let { message ->
             onShowError?.invoke(message)
-            settingViewModel?.clearError()
+            settingViewModel.clearError()
         }
 
         LazyColumn(
@@ -1653,7 +2005,7 @@ object SettingScreen {
                 onDismiss = { settingViewModel?.hideRegisterDialog() },
                 onRegister = { username, email, password ->
                     settingViewModel?.validateRegisterForm()?.let { error ->
-                        settingViewModel?.showError(error)
+                        settingViewModel.showError(error)
                         return@RegisterDialog
                     }
                     settingViewModel?.setRegisterLoading(true)
