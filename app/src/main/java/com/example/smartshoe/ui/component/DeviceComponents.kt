@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -318,14 +319,17 @@ fun CompactDeviceListItem(
             when {
                 useNewStyle && isConnected -> {
                     // 新样式：使用 disconnect_device 图标作为断开按钮
-                    Icon(
-                        painter = painterResource(R.drawable.disconnect_device),
-                        contentDescription = "断开连接",
-                        tint = AppColors.Error,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable { onDisconnect() }
-                    )
+                    IconButton(
+                        onClick = onDisconnect,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.disconnect_device),
+                            contentDescription = "断开连接",
+                            tint = AppColors.Error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
                 isConnected -> {
                     // 旧样式：蓝牙图标

@@ -28,9 +28,9 @@ import com.example.smartshoe.ui.viewmodel.SensorDataViewModel
 import com.example.smartshoe.ui.viewmodel.SettingViewModel
 import com.example.smartshoe.ui.viewmodel.UserProfileViewModel
 import com.example.smartshoe.ui.screen.MainScreen
-import com.example.smartshoe.ui.screen.MainScreenState
-import com.example.smartshoe.ui.screen.MainScreenCallbacks
-import com.example.smartshoe.ui.screen.SnackbarType
+import com.example.smartshoe.ui.screen.main.MainScreenState
+import com.example.smartshoe.ui.screen.main.MainScreenCallbacks
+import com.example.smartshoe.ui.screen.main.SnackbarType
 
 
 /**
@@ -331,8 +331,8 @@ class MainActivity : ComponentActivity() {
             // 清空历史记录数据
             historyRecordViewModel.clearHistoryData()
 
-            // 清空AI助手消息
-            aiAssistantViewModel.clearMessages()
+            // 清空AI助手消息和缓存
+            aiAssistantViewModel.clearAllAiData()
 
             // 清空蓝牙设备列表并断开连接
             bluetoothViewModel.clearDevices()

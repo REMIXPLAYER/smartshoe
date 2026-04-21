@@ -410,6 +410,27 @@ class AiAssistantViewModel @Inject constructor(
     }
 
     /**
+     * 清空AI分析缓存
+     */
+    fun clearAnalysisCache() {
+        analysisCache.clear()
+    }
+
+    /**
+     * 清空所有AI数据（消息+缓存）
+     */
+    fun clearAllAiData() {
+        clearMessages()
+        clearAnalysisCache()
+        _historyRecords.value = emptyList()
+        _uiState.value = AiAssistantUiState()
+        _aiStatus.value = AiServiceStatus.Unknown
+        _connectionState.value = SseConnectionState.Idle
+        currentSseJob?.cancel()
+        currentSseJob = null
+    }
+
+    /**
      * 添加消息到列表
      * 限制最大消息数，防止内存无限增长
      * 策略：保留第一条欢迎消息，移除最旧的用户/AI消息

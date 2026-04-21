@@ -48,7 +48,7 @@ fun VersionInfoContent() {
             ) {
                 InfoRow(icon = R.drawable.icon_foot, label = "应用名称", value = "举足凝健")
                 HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
-                InfoRow(iconVector = Icons.Default.Info, label = "版本号", value = "v1.2.0")
+                InfoRow(iconVector = Icons.Default.Info, label = "版本号", value = "v1.3.0")
                 HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
                 InfoRow(icon = R.drawable.cloud, label = "构建日期", value = "2026年4月")
                 HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
