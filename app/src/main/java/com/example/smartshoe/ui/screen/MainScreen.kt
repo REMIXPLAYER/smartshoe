@@ -3,7 +3,6 @@ package com.example.smartshoe.ui.screen
 import android.bluetooth.BluetoothDevice
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
@@ -15,6 +14,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +26,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +65,9 @@ data class MainScreenState(
     val userWeight: Float = 0f,
     // 蓝牙扫描状态
     val isScanning: Boolean = false,
+    // 蓝牙连接状态
+    val isConnecting: Boolean = false,
+    val connectingDeviceAddress: String? = null,
     // 用户认证
     val userState: UserState = UserState(),
     val isLoggedIn: Boolean = false,
@@ -82,8 +87,21 @@ data class MainScreenState(
     val historyEndDate: Date? = null,
     val queryExecuted: Boolean = false,
     // 导航
-    val selectedTab: Int = 0
+    val selectedTab: Int = 0,
+    // Snackbar 消息
+    val snackbarMessage: String? = null,
+    val snackbarType: SnackbarType = SnackbarType.Info
 )
+
+/**
+ * Snackbar 类型
+ */
+enum class SnackbarType {
+    Success,
+    Error,
+    Info,
+    Warning
+}
 
 /**
  * 主屏幕回调数据类
@@ -128,7 +146,9 @@ data class MainScreenCallbacks(
     // 错误提示
     val onShowError: ((String) -> Unit)? = null,
     // AI分析 - 从历史记录页面跳转
-    val onAiAnalysisClick: ((String) -> Unit)? = null
+    val onAiAnalysisClick: ((String) -> Unit)? = null,
+    // Snackbar
+    val onSnackbarDismiss: () -> Unit = {}
 )
 
 /**
@@ -143,11 +163,36 @@ fun MainScreen(
     state: MainScreenState,
     callbacks: MainScreenCallbacks
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    
+    // 显示 Snackbar
+    LaunchedEffect(state.snackbarMessage) {
+        state.snackbarMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            callbacks.onSnackbarDismiss()
+        }
+    }
+    
     SmartShoeAppTheme {
-        MainAppScreen(
-            state = state,
-            callbacks = callbacks
-        )
+        Scaffold(
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.padding(bottom = 80.dp)
+                ) { data ->
+                    CustomSnackbar(
+                        message = data.visuals.message,
+                        type = state.snackbarType
+                    )
+                }
+            }
+        ) { innerPadding ->
+            MainAppScreen(
+                state = state,
+                callbacks = callbacks,
+                modifier = Modifier.padding(innerPadding)
+            )
+        }
 
         // 显示压力异常消息弹窗
         if (state.showAlertDialog) {
@@ -186,7 +231,8 @@ private fun SmartShoeAppTheme(content: @Composable () -> Unit) {
 @Composable
 private fun MainAppScreen(
     state: MainScreenState,
-    callbacks: MainScreenCallbacks
+    callbacks: MainScreenCallbacks,
+    modifier: Modifier = Modifier
 ) {
     // 使用remember稳定列表参数，避免不必要的重组
     val stableScannedDevices by remember(state.scannedDevices) {
@@ -203,6 +249,7 @@ private fun MainAppScreen(
     }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             AppTopBar()
         },
@@ -227,7 +274,9 @@ private fun MainAppScreen(
                         onConnectDevice = callbacks.onConnectDevice,
                         onDisconnectDevice = callbacks.onDisconnectDevice,
                         connectedDevice = state.connectedDevice,
-                        isScanning = state.isScanning
+                        isScanning = state.isScanning,
+                        isConnecting = state.isConnecting,
+                        connectingDeviceAddress = state.connectingDeviceAddress
                     )
                 }
 
@@ -339,7 +388,9 @@ private fun MainContent(
     connectedDevice: BluetoothDevice?,
     onConnectDevice: (BluetoothDevice) -> Unit,
     onDisconnectDevice: () -> Unit,
-    isScanning: Boolean
+    isScanning: Boolean,
+    isConnecting: Boolean = false,
+    connectingDeviceAddress: String? = null
 ) {
     Box(
         modifier = modifier
@@ -380,6 +431,8 @@ private fun MainContent(
             onDisconnectDevice = onDisconnectDevice,
             onScanDevices = onScanDevices,
             isScanning = isScanning,
+            isConnecting = isConnecting,
+            connectingDeviceAddress = connectingDeviceAddress,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
@@ -402,7 +455,9 @@ fun ExpandableDeviceListSection(
     onDisconnectDevice: () -> Unit,
     onScanDevices: () -> Unit,
     isScanning: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isConnecting: Boolean = false,
+    connectingDeviceAddress: String? = null
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -545,7 +600,10 @@ fun ExpandableDeviceListSection(
                     } else {
                         // 已连接设备详情头部（展开后显示）
                         if (connectedDevice != null) {
-                            ConnectedDeviceHeader(device = connectedDevice)
+                            ConnectedDeviceHeader(
+                                device = connectedDevice,
+                                onDisconnect = onDisconnectDevice
+                            )
                         }
 
                         LazyColumn(
@@ -554,14 +612,22 @@ fun ExpandableDeviceListSection(
                                 .heightIn(max = 200.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                         ) {
-                            items(devices) { device ->
+                            // 过滤掉已连接的设备，避免重复显示
+                            val displayDevices = devices.filter { it.address != connectedDevice?.address }
+                            
+                            items(displayDevices) { device ->
+                                val deviceAddress = device.address
+                                val isThisDeviceConnecting = isConnecting && connectingDeviceAddress == deviceAddress
+                                
                                 CompactDeviceListItem(
                                     device = device,
-                                    isConnected = connectedDevice?.address == device.address,
+                                    isConnected = false, // 这里都是未连接的设备
+                                    isConnecting = isThisDeviceConnecting,
+                                    isAnyDeviceConnecting = isConnecting,
                                     onConnect = { onConnectDevice(device) },
                                     onDisconnect = onDisconnectDevice
                                 )
-                                if (device != devices.last()) {
+                                if (device != displayDevices.last()) {
                                     HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
                                 }
                             }
@@ -576,9 +642,13 @@ fun ExpandableDeviceListSection(
 /**
  * 已连接设备详情头部
  * 展开蓝牙设备列表后显示，展示详细的连接设备信息
+ * 左侧显示connect_device图标，右侧显示disconnect_device图标用于断开连接
  */
 @Composable
-private fun ConnectedDeviceHeader(device: BluetoothDevice) {
+private fun ConnectedDeviceHeader(
+    device: BluetoothDevice,
+    onDisconnect: () -> Unit
+) {
     val displayName = getDeviceDisplayName(device)
 
     Surface(
@@ -594,11 +664,12 @@ private fun ConnectedDeviceHeader(device: BluetoothDevice) {
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 左侧：已连接设备图标
             Icon(
-                painter = painterResource(R.drawable.bluetooth),
-                contentDescription = null,
+                painter = painterResource(R.drawable.connect_device),
+                contentDescription = "已连接设备",
                 tint = AppColors.Primary,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -618,30 +689,80 @@ private fun ConnectedDeviceHeader(device: BluetoothDevice) {
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            // 在线状态指示
-            ConnectedIndicator()
+            // 右侧：断开连接图标按钮
+            Icon(
+                painter = painterResource(R.drawable.disconnect_device),
+                contentDescription = "断开连接",
+                tint = AppColors.Error,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { onDisconnect() }
+            )
         }
     }
 }
 
 /**
- * 连接状态指示器
+ * 自定义 Snackbar 组件
+ * 符合应用设计规范，使用主题色和圆角设计
  */
 @Composable
-private fun ConnectedIndicator() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
+fun CustomSnackbar(
+    message: String,
+    modifier: Modifier = Modifier,
+    type: SnackbarType = SnackbarType.Info
+) {
+    val (backgroundColor, iconColor, icon) = when (type) {
+        SnackbarType.Success -> Triple(
+            AppColors.Success.copy(alpha = 0.9f),
+            Color.White,
+            Icons.Default.CheckCircle
+        )
+        SnackbarType.Error -> Triple(
+            AppColors.Error.copy(alpha = 0.9f),
+            Color.White,
+            Icons.Default.Close
+        )
+        SnackbarType.Warning -> Triple(
+            AppColors.Warning.copy(alpha = 0.9f),
+            AppColors.TextDark,
+            Icons.Default.Warning
+        )
+        SnackbarType.Info -> Triple(
+            AppColors.Primary.copy(alpha = 0.9f),
+            Color.White,
+            Icons.Default.Info
+        )
+    }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = backgroundColor,
+        shadowElevation = 4.dp
+    ) {
+        Row(
             modifier = Modifier
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(AppColors.Success)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = "在线",
-            fontSize = 11.sp,
-            color = AppColors.Success,
-            fontWeight = FontWeight.Medium
-        )
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = message,
+                color = iconColor,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }

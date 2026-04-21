@@ -36,6 +36,12 @@ class BluetoothViewModel @Inject constructor(
     // 是否正在扫描 - 从 Manager 转发
     val isScanning: StateFlow<Boolean> = bluetoothConnectionManager.isScanning
 
+    // 是否正在连接 - 从 Manager 转发
+    val isConnecting: StateFlow<Boolean> = bluetoothConnectionManager.isConnecting
+
+    // 当前正在连接的设备地址 - 从 Manager 转发
+    val connectingDeviceAddress: StateFlow<String?> = bluetoothConnectionManager.connectingDeviceAddress
+
     init {
         // 使用SavedStateHandle避免配置变更时重复设置回调
         val isCallbackSet = savedStateHandle.get<Boolean>(KEY_ERROR_CALLBACK_SET) ?: false

@@ -234,5 +234,12 @@ object AppConfig {
         const val CACHE_INITIAL_CAPACITY = 16
         const val CACHE_LOAD_FACTOR = 0.75f
         const val CACHE_ACCESS_ORDER = true
+
+        // 流式传输节流配置
+        const val STREAM_MIN_UPDATE_INTERVAL_MS = 50L        // 最小更新间隔（毫秒）
+        const val STREAM_MAX_CHARS_BEFORE_UPDATE = 20         // 最大累积字符数
+        val STREAM_IMMEDIATE_UPDATE_CHARS = setOf(            // 立即更新触发字符
+            '。', '！', '？', '.', '!', '?', '\n', '｜'
+        )
     }
 }

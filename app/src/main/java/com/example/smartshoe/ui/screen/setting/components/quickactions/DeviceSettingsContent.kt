@@ -52,6 +52,7 @@ fun DeviceSettingsContent(
                 CompactDeviceListItem(
                     device = device,
                     isConnected = true,
+                    useNewStyle = true,  // 使用新样式：左侧connect_device图标，右侧disconnect_device图标
                     onConnect = {},
                     onDisconnect = onDisconnectDevice
                 )

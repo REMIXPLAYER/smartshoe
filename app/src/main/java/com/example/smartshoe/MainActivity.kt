@@ -30,6 +30,7 @@ import com.example.smartshoe.ui.viewmodel.UserProfileViewModel
 import com.example.smartshoe.ui.screen.MainScreen
 import com.example.smartshoe.ui.screen.MainScreenState
 import com.example.smartshoe.ui.screen.MainScreenCallbacks
+import com.example.smartshoe.ui.screen.SnackbarType
 
 
 /**
@@ -59,6 +60,10 @@ class MainActivity : ComponentActivity() {
 
     // 压力提醒冷却时间
     private var lastAlertTime = 0L
+
+    // Snackbar 状态
+    private var snackbarMessage: String? = null
+    private var snackbarType: SnackbarType = SnackbarType.Info
 
     @Inject
     lateinit var performanceMonitor: PerformanceMonitor
@@ -103,6 +108,15 @@ class MainActivity : ComponentActivity() {
         bluetoothConnectionManager.onError = { message ->
             runOnUiThread {
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
+        }
+        bluetoothConnectionManager.onConnectionResult = { success, errorMessage ->
+            runOnUiThread {
+                if (success) {
+                    showSnackbarMessage("蓝牙设备连接成功", SnackbarType.Success)
+                } else {
+                    showSnackbarMessage(errorMessage ?: "连接失败", SnackbarType.Error)
+                }
             }
         }
 
@@ -150,6 +164,9 @@ class MainActivity : ComponentActivity() {
                 userWeight = userProfileViewModel.userWeight.collectAsStateWithLifecycle().value,
                 // 蓝牙扫描状态
                 isScanning = bluetoothViewModel.isScanning.collectAsStateWithLifecycle().value,
+                // 蓝牙连接状态
+                isConnecting = bluetoothViewModel.isConnecting.collectAsStateWithLifecycle().value,
+                connectingDeviceAddress = bluetoothViewModel.connectingDeviceAddress.collectAsStateWithLifecycle().value,
                 // 用户认证
                 userState = authViewModel.userState.collectAsStateWithLifecycle().value,
                 isLoggedIn = authViewModel.userState.collectAsStateWithLifecycle().value.isLoggedIn,
@@ -169,7 +186,10 @@ class MainActivity : ComponentActivity() {
                 historyEndDate = historyRecordViewModel.historyEndDate.collectAsStateWithLifecycle().value,
                 queryExecuted = historyRecordViewModel.queryExecuted.collectAsStateWithLifecycle().value,
                 // 导航
-                selectedTab = mainViewModel.selectedTab.collectAsStateWithLifecycle().value
+                selectedTab = mainViewModel.selectedTab.collectAsStateWithLifecycle().value,
+                // Snackbar
+                snackbarMessage = snackbarMessage,
+                snackbarType = snackbarType
             )
 
             val callbacks = MainScreenCallbacks(
@@ -238,6 +258,10 @@ class MainActivity : ComponentActivity() {
                     mainViewModel.selectTab(3)
                     // 触发分析
                     aiAssistantViewModel?.analyzeRecord(recordId, authViewModel.tokenState.value ?: "")
+                },
+                // Snackbar
+                onSnackbarDismiss = { 
+                    snackbarMessage = null 
                 }
             )
 
@@ -249,6 +273,16 @@ class MainActivity : ComponentActivity() {
     }
 
 
+
+    /**
+     * 显示 Snackbar 消息
+     * @param message 消息内容
+     * @param type 消息类型
+     */
+    private fun showSnackbarMessage(message: String, type: SnackbarType = SnackbarType.Info) {
+        snackbarMessage = message
+        snackbarType = type
+    }
 
     /**
      * 显示日期选择器

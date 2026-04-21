@@ -117,7 +117,14 @@ class AiAssistantViewModel @Inject constructor(
 
     /**
      * 发送消息给AI（流式版本）
-     * 优化：批量更新减少UI重组，支持取消，保留错误消息
+     * 优化：智能节流，平衡流畅度和性能
+     * 
+     * 节流策略：
+     * 1. 标点符号后（。！？.!?）立即更新
+     * 2. 换行符后立即更新
+     * 3. 累积超过20个字符立即更新
+     * 4. 距离上次更新超过50ms时更新
+     * 5. 代码块标记（```）立即更新
      */
     fun sendMessage(message: String, token: String) {
         if (message.isBlank()) return
@@ -137,6 +144,11 @@ class AiAssistantViewModel @Inject constructor(
 
             var fullResponse = ""
             var modelName = AppConfig.AiAssistant.DEFAULT_MODEL
+            
+            // 节流控制变量
+            var pendingContent = ""  // 待更新的内容缓冲区
+            var lastUpdateTime = System.currentTimeMillis()  // 上次更新时间，初始化为当前时间避免首次立即更新
+            var charsSinceUpdate = 0 // 自上次更新以来的字符数
 
             // 使用 UseCase 进行流式传输，符合 Clean Architecture
             sendMessageUseCase(
@@ -151,25 +163,57 @@ class AiAssistantViewModel @Inject constructor(
                     is SseEvent.Data -> {
                         // 累积响应内容
                         fullResponse += event.content
-
-                        // 关键改进：移除节流机制，每次内容变化都立即更新 UI
-                        // 这样 snapshotFlow 才能正确检测到变化并触发滚动
-                        val currentMessages = _messages.value
-                        val lastMsg = currentMessages.lastOrNull()
-                        val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
-                            lastMsg.timestamp  // 保持 timestamp 不变，确保 LazyColumn 的 key 稳定
-                        } else {
-                            System.currentTimeMillis()
+                        pendingContent += event.content
+                        charsSinceUpdate += event.content.length
+                        
+                        val currentTime = System.currentTimeMillis()
+                        val timeSinceLastUpdate = currentTime - lastUpdateTime
+                        
+                        // 检查是否需要立即更新
+                            val shouldUpdateImmediately = event.content.any { it in AppConfig.AiAssistant.STREAM_IMMEDIATE_UPDATE_CHARS } ||
+                                    charsSinceUpdate >= AppConfig.AiAssistant.STREAM_MAX_CHARS_BEFORE_UPDATE ||
+                                    timeSinceLastUpdate >= AppConfig.AiAssistant.STREAM_MIN_UPDATE_INTERVAL_MS
+                        
+                        if (shouldUpdateImmediately) {
+                            val currentMessages = _messages.value
+                            val lastMsg = currentMessages.lastOrNull()
+                            val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
+                                lastMsg.timestamp
+                            } else {
+                                System.currentTimeMillis()
+                            }
+                            updateLastMessage(ChatMessage.StreamingAi(
+                                content = fullResponse,
+                                model = modelName,
+                                timestamp = timestamp
+                            ))
+                            
+                            // 重置节流变量
+                            pendingContent = ""
+                            lastUpdateTime = currentTime
+                            charsSinceUpdate = 0
                         }
-                        updateLastMessage(ChatMessage.StreamingAi(
-                            content = fullResponse,
-                            model = modelName,
-                            timestamp = timestamp
-                        ))
                     }
                     is SseEvent.Complete -> {
                         modelName = event.model
                         val generationTimeMs = event.duration / AppConfig.AiAssistant.NANOSECONDS_TO_MILLISECONDS
+                        
+                        // 确保所有待更新内容都刷新到UI
+                        if (pendingContent.isNotEmpty()) {
+                            val currentMessages = _messages.value
+                            val lastMsg = currentMessages.lastOrNull()
+                            val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
+                                lastMsg.timestamp
+                            } else {
+                                System.currentTimeMillis()
+                            }
+                            updateLastMessage(ChatMessage.StreamingAi(
+                                content = fullResponse,
+                                model = modelName,
+                                timestamp = timestamp
+                            ))
+                        }
+                        
                         // 直接将流式消息转换为普通AI消息，避免两次更新
                         replaceLastMessage(ChatMessage.Ai(
                             content = fullResponse,
@@ -189,6 +233,23 @@ class AiAssistantViewModel @Inject constructor(
                             error = event.message
                         )
                         onError?.invoke(event.message)
+                        
+                        // 确保所有待更新内容都刷新到UI
+                        if (pendingContent.isNotEmpty()) {
+                            val currentMessages = _messages.value
+                            val lastMsg = currentMessages.lastOrNull()
+                            val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
+                                lastMsg.timestamp
+                            } else {
+                                System.currentTimeMillis()
+                            }
+                            updateLastMessage(ChatMessage.StreamingAi(
+                                content = fullResponse,
+                                model = modelName,
+                                timestamp = timestamp
+                            ))
+                        }
+                        
                         // 将流式消息转换为错误消息，而不是移除
                         if (fullResponse.isNotEmpty()) {
                             replaceLastMessage(ChatMessage.Ai(
@@ -462,7 +523,11 @@ class AiAssistantViewModel @Inject constructor(
 
             var fullResponse = ""
             var modelName = AppConfig.AiAssistant.DEFAULT_MODEL
-            var updateCounter = 0
+            
+            // 节流控制变量
+            var pendingContent = ""
+            var lastUpdateTime = System.currentTimeMillis()  // 初始化为当前时间避免首次立即更新
+            var charsSinceUpdate = 0
 
             // 使用 UseCase 进行流式分析，符合 Clean Architecture
             currentSseJob = launch {
@@ -476,14 +541,20 @@ class AiAssistantViewModel @Inject constructor(
                 ).collect { event ->
                     when (event) {
                         is SseEvent.Data -> {
+                            // 累积响应内容
                             fullResponse += event.content
-                            updateCounter++
-
-                            // 批量更新UI
-                            if (updateCounter >= AppConfig.AiAssistant.UPDATE_INTERVAL ||
-                                event.content.contains(Regex("[。！？.!?\\n]"))
-                            ) {
-                                // 使用相同的timestamp更新，确保LazyColumn的key稳定
+                            pendingContent += event.content
+                            charsSinceUpdate += event.content.length
+                            
+                            val currentTime = System.currentTimeMillis()
+                            val timeSinceLastUpdate = currentTime - lastUpdateTime
+                            
+                            // 检查是否需要立即更新
+                            val shouldUpdateImmediately = event.content.any { it in AppConfig.AiAssistant.STREAM_IMMEDIATE_UPDATE_CHARS } ||
+                                    charsSinceUpdate >= AppConfig.AiAssistant.STREAM_MAX_CHARS_BEFORE_UPDATE ||
+                                    timeSinceLastUpdate >= AppConfig.AiAssistant.STREAM_MIN_UPDATE_INTERVAL_MS
+                            
+                            if (shouldUpdateImmediately) {
                                 val currentMessages = _messages.value
                                 val lastMsg = currentMessages.lastOrNull()
                                 val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
@@ -496,12 +567,33 @@ class AiAssistantViewModel @Inject constructor(
                                     model = modelName,
                                     timestamp = timestamp
                                 ))
-                                updateCounter = 0
+                                
+                                // 重置节流变量
+                                pendingContent = ""
+                                lastUpdateTime = currentTime
+                                charsSinceUpdate = 0
                             }
                         }
                         is SseEvent.Complete -> {
                             modelName = event.model
                             val generationTimeMs = event.duration / AppConfig.AiAssistant.NANOSECONDS_TO_MILLISECONDS
+                            
+                            // 确保所有待更新内容都刷新到UI
+                            if (pendingContent.isNotEmpty()) {
+                                val currentMessages = _messages.value
+                                val lastMsg = currentMessages.lastOrNull()
+                                val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
+                                    lastMsg.timestamp
+                                } else {
+                                    System.currentTimeMillis()
+                                }
+                                updateLastMessage(ChatMessage.StreamingAi(
+                                    content = fullResponse,
+                                    model = modelName,
+                                    timestamp = timestamp
+                                ))
+                            }
+                            
                             // 直接将流式消息转换为AI消息，避免两次更新
                             replaceLastMessage(ChatMessage.Ai(
                                 content = fullResponse,
@@ -527,6 +619,23 @@ class AiAssistantViewModel @Inject constructor(
                                 error = event.message
                             )
                             onError?.invoke(event.message)
+                            
+                            // 确保所有待更新内容都刷新到UI
+                            if (pendingContent.isNotEmpty()) {
+                                val currentMessages = _messages.value
+                                val lastMsg = currentMessages.lastOrNull()
+                                val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
+                                    lastMsg.timestamp
+                                } else {
+                                    System.currentTimeMillis()
+                                }
+                                updateLastMessage(ChatMessage.StreamingAi(
+                                    content = fullResponse,
+                                    model = modelName,
+                                    timestamp = timestamp
+                                ))
+                            }
+                            
                             // 保留已生成的内容
                             if (fullResponse.isNotEmpty()) {
                                 replaceLastMessage(ChatMessage.Ai(

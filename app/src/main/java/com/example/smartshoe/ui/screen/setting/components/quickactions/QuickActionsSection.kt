@@ -99,7 +99,7 @@ fun QuickActionsSection(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 QuickActionButton(
-                    icon = R.drawable.bluetooth,
+                    icon = R.drawable.devicelist,
                     label = "设备",
                     isActive = expandedItem == "device",
                     onClick = {

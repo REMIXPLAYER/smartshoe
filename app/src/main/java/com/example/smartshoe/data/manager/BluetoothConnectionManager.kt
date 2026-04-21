@@ -50,11 +50,22 @@ class BluetoothConnectionManager @Inject constructor(
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    // 连接状态
+    private val _isConnecting = MutableStateFlow(false)
+    val isConnecting: StateFlow<Boolean> = _isConnecting.asStateFlow()
+
+    // 当前正在连接的设备地址
+    private val _connectingDeviceAddress = MutableStateFlow<String?>(null)
+    val connectingDeviceAddress: StateFlow<String?> = _connectingDeviceAddress.asStateFlow()
+
     // 数据接收回调
     var onDataReceived: ((String) -> Unit)? = null
 
     // 错误回调
     var onError: ((String) -> Unit)? = null
+
+    // 连接结果回调
+    var onConnectionResult: ((Boolean, String?) -> Unit)? = null
 
     companion object {
         private const val TAG = "BluetoothConnManager"
@@ -95,7 +106,6 @@ class BluetoothConnectionManager @Inject constructor(
 
     // 连接操作锁，防止并发连接
     private val connectionLock = Any()
-    private var isConnecting = false
 
     /**
      * 连接蓝牙设备
@@ -106,17 +116,28 @@ class BluetoothConnectionManager @Inject constructor(
         // 检查蓝牙适配器状态
         if (bluetoothAdapter?.isEnabled != true) {
             onError?.invoke("蓝牙未开启")
+            onConnectionResult?.invoke(false, "蓝牙未开启")
             return@withContext false
         }
 
-        // 防止并发连接
+        // 防止并发连接 - 使用 StateFlow 进行状态管理
         synchronized(connectionLock) {
-            if (isConnecting) {
+            if (_isConnecting.value) {
                 Log.w(TAG, "Already connecting to a device, please wait")
                 onError?.invoke("正在连接其他设备，请稍候")
+                onConnectionResult?.invoke(false, "正在连接其他设备，请稍候")
                 return@withContext false
             }
-            isConnecting = true
+            
+            // 检查是否已经连接到该设备
+            if (_connectedDevice.value?.address == device.address) {
+                Log.w(TAG, "Already connected to this device")
+                onConnectionResult?.invoke(true, null)
+                return@withContext true
+            }
+            
+            _isConnecting.value = true
+            _connectingDeviceAddress.value = device.address
         }
 
         try {
@@ -148,6 +169,7 @@ class BluetoothConnectionManager @Inject constructor(
                 closeSocketSafely(socket)
                 Log.e(TAG, "Connection timeout")
                 onError?.invoke("连接超时，请重试")
+                onConnectionResult?.invoke(false, "连接超时，请重试")
                 return@withContext false
             }
 
@@ -156,6 +178,7 @@ class BluetoothConnectionManager @Inject constructor(
                 closeSocketSafely(socket)
                 Log.e(TAG, "Socket not connected after connect()")
                 onError?.invoke("连接失败")
+                onConnectionResult?.invoke(false, "连接失败")
                 return@withContext false
             }
 
@@ -169,14 +192,17 @@ class BluetoothConnectionManager @Inject constructor(
             startDataListening(device.address, socket)
 
             Log.d(TAG, "Connected to device: ${device.name} (${device.address})")
+            onConnectionResult?.invoke(true, null)
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error connecting to device: ${e.message}")
             onError?.invoke("连接失败: ${e.message}")
+            onConnectionResult?.invoke(false, "连接失败: ${e.message}")
             false
         } finally {
             synchronized(connectionLock) {
-                isConnecting = false
+                _isConnecting.value = false
+                _connectingDeviceAddress.value = null
             }
         }
     }
