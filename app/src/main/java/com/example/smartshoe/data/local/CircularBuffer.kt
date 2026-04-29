@@ -1,6 +1,8 @@
 package com.example.smartshoe.data.local
 
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 /**
  * 环形缓冲区实现 - 用于高效管理固定容量的传感器数据
@@ -13,42 +15,37 @@ import java.util.concurrent.atomic.AtomicInteger
 class CircularBuffer<T>(private val capacity: Int) {
 
     private val buffer = Array<Any?>(capacity) { null }
-    private val head = AtomicInteger(0) // 写入位置
-    private val count = AtomicInteger(0) // 当前元素数量
-    private var tail = 0 // 读取起始位置（仅在获取快照时使用）
+    private var head = 0
+    private var count = 0
+    private val lock = ReentrantReadWriteLock()
 
     /**
      * 添加元素到缓冲区 - O(1)时间复杂度
      */
     fun add(element: T) {
-        val currentHead = head.getAndIncrement()
-        val index = currentHead % capacity
-        buffer[index] = element
-
-        // 更新元素数量（不超过容量）
-        val currentCount = count.get()
-        if (currentCount < capacity) {
-            count.incrementAndGet()
-        } else {
-            // 缓冲区已满，移动tail
-            tail = (currentHead + 1) % capacity
+        lock.write {
+            buffer[head] = element
+            head = (head + 1) % capacity
+            if (count < capacity) {
+                count++
+            }
         }
     }
 
     /**
      * 获取当前元素数量
      */
-    fun size(): Int = count.get()
+    fun size(): Int = lock.read { count }
 
     /**
      * 检查缓冲区是否为空
      */
-    fun isEmpty(): Boolean = count.get() == 0
+    fun isEmpty(): Boolean = lock.read { count == 0 }
 
     /**
      * 检查缓冲区是否已满
      */
-    fun isFull(): Boolean = count.get() >= capacity
+    fun isFull(): Boolean = lock.read { count >= capacity }
 
     /**
      * 获取缓冲区容量
@@ -59,12 +56,13 @@ class CircularBuffer<T>(private val capacity: Int) {
      * 清空缓冲区
      */
     fun clear() {
-        for (i in buffer.indices) {
-            buffer[i] = null
+        lock.write {
+            for (i in buffer.indices) {
+                buffer[i] = null
+            }
+            head = 0
+            count = 0
         }
-        head.set(0)
-        count.set(0)
-        tail = 0
     }
 
     /**
@@ -73,27 +71,26 @@ class CircularBuffer<T>(private val capacity: Int) {
      */
     @Suppress("UNCHECKED_CAST")
     fun toOrderedList(): List<T> {
-        val currentCount = count.get()
-        if (currentCount == 0) return emptyList()
+        lock.read {
+            if (count == 0) return emptyList()
 
-        val result = ArrayList<T>(currentCount)
-        val currentHead = head.get()
+            val result = ArrayList<T>(count)
 
-        if (currentCount < capacity) {
-            // 缓冲区未满，从0到currentHead-1
-            for (i in 0 until currentHead) {
-                buffer[i]?.let { result.add(it as T) }
+            if (count < capacity) {
+                val start = (head - count + capacity) % capacity
+                for (i in 0 until count) {
+                    val index = (start + i) % capacity
+                    buffer[index]?.let { result.add(it as T) }
+                }
+            } else {
+                for (i in 0 until capacity) {
+                    val index = (head + i) % capacity
+                    buffer[index]?.let { result.add(it as T) }
+                }
             }
-        } else {
-            // 缓冲区已满，从tail开始遍历
-            val currentTail = currentHead % capacity
-            for (i in 0 until capacity) {
-                val index = (currentTail + i) % capacity
-                buffer[index]?.let { result.add(it as T) }
-            }
+
+            return result
         }
-
-        return result
     }
 
     /**
@@ -101,19 +98,19 @@ class CircularBuffer<T>(private val capacity: Int) {
      */
     @Suppress("UNCHECKED_CAST")
     fun getLatest(n: Int): List<T> {
-        val currentCount = count.get()
-        val actualN = minOf(n, currentCount)
-        if (actualN == 0) return emptyList()
+        lock.read {
+            val actualN = minOf(n, count)
+            if (actualN == 0) return emptyList()
 
-        val result = ArrayList<T>(actualN)
-        val currentHead = head.get()
+            val result = ArrayList<T>(actualN)
 
-        for (i in 1..actualN) {
-            val index = (currentHead - i + capacity) % capacity
-            buffer[index]?.let { result.add(0, it as T) } // 插入头部保持顺序
+            for (i in 1..actualN) {
+                val index = (head - i + capacity) % capacity
+                buffer[index]?.let { result.add(0, it as T) }
+            }
+
+            return result
         }
-
-        return result
     }
 
     /**
@@ -121,10 +118,11 @@ class CircularBuffer<T>(private val capacity: Int) {
      */
     @Suppress("UNCHECKED_CAST")
     fun getLatest(): T? {
-        if (isEmpty()) return null
-        val currentHead = head.get()
-        val index = (currentHead - 1 + capacity) % capacity
-        return buffer[index] as T?
+        lock.read {
+            if (count == 0) return null
+            val index = (head - 1 + capacity) % capacity
+            return buffer[index] as T?
+        }
     }
 }
 

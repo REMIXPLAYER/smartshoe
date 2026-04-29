@@ -67,13 +67,13 @@ object HistoryScreen {
             modifier = modifier
                 .fillMaxSize()
                 .background(AppColors.Background)
-                .padding(16.dp)
         ) {
             // 主内容区域（时间选择器和记录列表）- 始终显示在底层
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
             ) {
                 DateTimeSelector(
                     startDate = startDate,

@@ -9,11 +9,8 @@ import com.example.smartshoe.domain.model.SseConnectionState
 import com.example.smartshoe.domain.model.SseEvent
 import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.domain.model.SensorDataRecord
-import com.example.smartshoe.domain.usecase.ai.AnalyzeRecordUseCase
-import com.example.smartshoe.domain.usecase.ai.CheckAiStatusUseCase
-import com.example.smartshoe.domain.usecase.ai.GetHealthAdviceUseCase
-import com.example.smartshoe.domain.usecase.ai.SendMessageUseCase
-import com.example.smartshoe.domain.usecase.sensor.GetHistoryRecordsUseCase
+import com.example.smartshoe.domain.repository.AiAssistantRepository
+import com.example.smartshoe.domain.repository.HistoryRecordRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,17 +26,16 @@ import javax.inject.Inject
 /**
  * AI 助手 ViewModel
  * 管理 AI 对话和健康建议的状态
- * 
- * 重构：使用 UseCase 解耦，符合 Clean Architecture
+ *
+ * 架构：ViewModel 直接依赖 Repository 接口（领域层），符合 Clean Architecture
+ * - 内层（domain）不依赖外层（data/presentation）
+ * - 业务逻辑在 ViewModel 中处理，数据访问通过 Repository 接口抽象
  */
 @HiltViewModel
 class AiAssistantViewModel @Inject constructor(
     val savedStateHandle: SavedStateHandle,
-    private val sendMessageUseCase: SendMessageUseCase,
-    private val getHealthAdviceUseCase: GetHealthAdviceUseCase,
-    private val checkAiStatusUseCase: CheckAiStatusUseCase,
-    private val analyzeRecordUseCase: AnalyzeRecordUseCase,
-    private val getHistoryRecordsUseCase: GetHistoryRecordsUseCase
+    private val aiAssistantRepository: AiAssistantRepository,
+    private val historyRecordRepository: HistoryRecordRepository
 ) : ViewModel() {
 
     companion object {
@@ -100,7 +96,7 @@ class AiAssistantViewModel @Inject constructor(
     fun checkAiStatus() {
         viewModelScope.launch {
             _aiStatus.value = AiServiceStatus.Checking
-            when (val result = checkAiStatusUseCase()) {
+            when (val result = aiAssistantRepository.checkAiStatus()) {
                 is AiStatusResult.Success -> {
                     _aiStatus.value = if (result.isAvailable) {
                         AiServiceStatus.Available(result.model)
@@ -150,8 +146,8 @@ class AiAssistantViewModel @Inject constructor(
             var lastUpdateTime = System.currentTimeMillis()  // 上次更新时间，初始化为当前时间避免首次立即更新
             var charsSinceUpdate = 0 // 自上次更新以来的字符数
 
-            // 使用 UseCase 进行流式传输，符合 Clean Architecture
-            sendMessageUseCase(
+            // 使用 Repository 进行流式传输
+            aiAssistantRepository.sendMessageStream(
                 message = message,
                 token = token,
                 enableThinking = _enableThinking.value,
@@ -378,7 +374,7 @@ class AiAssistantViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            when (val result = getHealthAdviceUseCase(recordId, token, userAge)) {
+            when (val result = aiAssistantRepository.getHealthAdvice(recordId, token, userAge)) {
                 is HealthAdviceResult.Success -> {
                     addMessage(ChatMessage.HealthAdvice(
                         content = result.advice,
@@ -490,23 +486,26 @@ class AiAssistantViewModel @Inject constructor(
 
     /**
      * 加载用户历史记录列表
-     * 使用 UseCase 解耦，符合 Clean Architecture
+     * 统一使用 HistoryRecordRepository 作为入口，与历史记录页面共享缓存
+     * 使用挂起函数等待异步加载完成，确保数据就绪后再更新UI
      */
     fun loadHistoryRecords(token: String) {
         _isLoadingHistory.value = true
-        getHistoryRecordsUseCase(
-            page = 0,
-            size = 20,
-            useCache = true,
-            onResult = { success, message, records, total ->
-                if (success && records != null) {
-                    _historyRecords.value = records
-                } else {
-                    onError?.invoke("加载历史记录失败: $message")
-                }
+        viewModelScope.launch {
+            try {
+                val records = historyRecordRepository.getHistoryRecordsAsync(
+                    page = 0,
+                    size = 20,
+                    startDate = null,
+                    endDate = null
+                )
+                _historyRecords.value = records
+            } catch (e: Exception) {
+                onError?.invoke("加载历史记录失败: ${e.message}")
+            } finally {
                 _isLoadingHistory.value = false
             }
-        )
+        }
     }
 
     /**
@@ -550,9 +549,9 @@ class AiAssistantViewModel @Inject constructor(
             var lastUpdateTime = System.currentTimeMillis()  // 初始化为当前时间避免首次立即更新
             var charsSinceUpdate = 0
 
-            // 使用 UseCase 进行流式分析，符合 Clean Architecture
+            // 使用 Repository 进行流式分析
             currentSseJob = launch {
-                analyzeRecordUseCase(
+                aiAssistantRepository.analyzeRecordStream(
                     recordId = recordId,
                     token = token,
                     enableThinking = _enableThinking.value,

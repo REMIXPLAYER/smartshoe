@@ -8,6 +8,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /**
@@ -65,7 +66,7 @@ abstract class BaseApiService {
             if (params.isNotEmpty()) {
                 urlBuilder.append("?")
                 params.entries.joinTo(urlBuilder, "&") { (key, value) ->
-                    "${key}=${value}"
+                    "${URLEncoder.encode(key, "UTF-8")}=${URLEncoder.encode(value.toString(), "UTF-8")}"
                 }
             }
 

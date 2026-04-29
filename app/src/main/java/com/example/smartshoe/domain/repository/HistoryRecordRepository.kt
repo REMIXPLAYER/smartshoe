@@ -19,14 +19,29 @@ interface HistoryRecordRepository {
     fun setCallback(callback: HistoryRecordCallback)
 
     /**
-     * 获取历史记录列表
+     * 获取历史记录列表（同步返回，适用于回调驱动架构）
+     * @param page 页码（从0开始）
+     * @param size 每页大小
+     * @param startDate 开始日期（可选）
+     * @param endDate 结束日期（可选）
+     * @return 历史记录列表（缓存未命中时返回当前已有数据）
+     */
+    fun getHistoryRecords(
+        page: Int = 0,
+        size: Int = 20,
+        startDate: Date? = null,
+        endDate: Date? = null
+    ): List<SensorDataRecord>
+
+    /**
+     * 获取历史记录列表（挂起函数，异步等待数据加载完成）
      * @param page 页码（从0开始）
      * @param size 每页大小
      * @param startDate 开始日期（可选）
      * @param endDate 结束日期（可选）
      * @return 历史记录列表
      */
-    fun getHistoryRecords(
+    suspend fun getHistoryRecordsAsync(
         page: Int = 0,
         size: Int = 20,
         startDate: Date? = null,

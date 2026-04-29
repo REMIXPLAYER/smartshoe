@@ -314,18 +314,10 @@ class SensorDataViewModel @Inject constructor(
 
         uploadDataToServer(dataPoints) { success, _ ->
             if (success) {
-                // 清空本地历史数据
-                clearHistoricalData()
+                clearSensorData()
             }
             onComplete(success)
         }
-    }
-
-    /**
-     * 清空历史数据（内部方法）
-     */
-    private fun clearHistoricalData() {
-        _historicalData.value = emptyList()
     }
 
     /**

@@ -41,7 +41,7 @@ fun SettingsList(
             AboutAppItem(
                 appIcon = AppIcons.Info,
                 title = "版本信息",
-                subtitle = "v1.2.0",
+                subtitle = "v1.3.0",
                 isExpanded = isVersionExpanded,
                 onExpandedChange = onVersionExpandedChange
             ) {

@@ -9,6 +9,7 @@ import android.util.Log
 import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.di.ApplicationScope
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,6 +67,9 @@ class BluetoothConnectionManager @Inject constructor(
 
     // 连接结果回调
     var onConnectionResult: ((Boolean, String?) -> Unit)? = null
+
+    // 蓝牙数据通道 - 用于背压控制
+    private val dataChannel = Channel<String>(Channel.BUFFERED)
 
     companion object {
         private const val TAG = "BluetoothConnManager"
@@ -224,6 +228,7 @@ class BluetoothConnectionManager @Inject constructor(
     fun disconnectDevice() {
         _connectedDevice.value?.let { device ->
             resourceManager.releaseDeviceResources(device.address)
+            resourceManager.releaseDeviceResources(device.address + "_dispatch")
             _connectedDevice.value = null
             Log.d(TAG, "Disconnected from device: ${device.address}")
         }
@@ -231,10 +236,11 @@ class BluetoothConnectionManager @Inject constructor(
 
     /**
      * 开始监听蓝牙数据
-     * 优化：正确处理协程取消，避免取消时触发错误回调
+     * 优化：使用 Channel 进行背压控制，避免高频数据导致内存泄漏
      */
     private fun startDataListening(deviceAddress: String, socket: BluetoothSocket) {
-        val job = connectionScope.launch {
+        // 启动数据读取协程
+        val readJob = connectionScope.launch {
             try {
                 val inputStream: InputStream = socket.inputStream
                 resourceManager.registerInputStream(deviceAddress, inputStream)
@@ -247,10 +253,9 @@ class BluetoothConnectionManager @Inject constructor(
                         bytes = inputStream.read(buffer)
                         if (bytes > 0) {
                             val data = String(buffer, 0, bytes)
-                            onDataReceived?.invoke(data)
+                            dataChannel.send(data)
                         }
                     } catch (e: Exception) {
-                        // 检查协程是否仍然活跃，避免取消时触发错误
                         if (!isActive) {
                             Log.d(TAG, "Data listening cancelled for device: $deviceAddress")
                             break
@@ -261,7 +266,6 @@ class BluetoothConnectionManager @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                // 检查协程是否仍然活跃，避免取消时触发错误
                 if (!isActive) {
                     Log.d(TAG, "Data listening cancelled for device: $deviceAddress")
                     return@launch
@@ -273,7 +277,24 @@ class BluetoothConnectionManager @Inject constructor(
             }
         }
 
-        resourceManager.registerJob(deviceAddress, job)
+        // 启动数据分发协程 - 通过 Channel 消费数据，实现背压控制
+        val dispatchJob = connectionScope.launch {
+            try {
+                for (data in dataChannel) {
+                    if (!isActive) break
+                    onDataReceived?.invoke(data)
+                }
+            } catch (e: Exception) {
+                if (!isActive) {
+                    Log.d(TAG, "Data dispatch cancelled for device: $deviceAddress")
+                    return@launch
+                }
+                Log.e(TAG, "Error dispatching data: ${e.message}")
+            }
+        }
+
+        resourceManager.registerJob(deviceAddress, readJob)
+        resourceManager.registerJob(deviceAddress + "_dispatch", dispatchJob)
     }
 
     /**

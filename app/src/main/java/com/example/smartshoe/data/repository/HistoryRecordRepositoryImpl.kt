@@ -5,9 +5,11 @@ import com.example.smartshoe.data.local.PagedDataCache
 import com.example.smartshoe.domain.model.SensorDataPoint
 import com.example.smartshoe.domain.model.SensorDataRecord
 import com.example.smartshoe.domain.repository.HistoryRecordRepository
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 
 /**
  * 历史记录仓库实现
@@ -114,6 +116,61 @@ class HistoryRecordRepositoryImpl @Inject constructor(
             callback?.onRecordsLoaded(_records.toList(), _hasMoreRecords)
         } else {
             callback?.onError(message)
+        }
+    }
+
+    override suspend fun getHistoryRecordsAsync(
+        page: Int,
+        size: Int,
+        startDate: Date?,
+        endDate: Date?
+    ): List<SensorDataRecord> {
+        // 检查查询条件是否变化
+        if (hasQueryParamsChanged(startDate, endDate)) {
+            historyCache.clear()
+            cachedStartDate = startDate
+            cachedEndDate = endDate
+            _records.clear()
+            currentHistoryPage = 0
+        }
+
+        // 检查缓存
+        if (historyCache.isPageCached(page)) {
+            val cachedData = historyCache.getPage(page) ?: emptyList()
+            _hasMoreRecords = cachedData.size >= historyPageSize
+            return cachedData
+        }
+
+        // 异步加载并等待结果
+        return suspendCancellableCoroutine { continuation ->
+            val tempCallback = object : HistoryRecordRepository.HistoryRecordCallback {
+                override fun onRecordsLoaded(records: List<SensorDataRecord>, hasMore: Boolean) {
+                    if (continuation.isActive) {
+                        continuation.resume(records)
+                    }
+                }
+
+                override fun onRecordDetailLoaded(recordId: String, dataPoints: List<SensorDataPoint>) {
+                    // 不处理详情回调
+                }
+
+                override fun onError(message: String) {
+                    if (continuation.isActive) {
+                        continuation.resume(emptyList())
+                    }
+                }
+            }
+
+            // 临时设置回调
+            val originalCallback = callback
+            callback = tempCallback
+
+            loadHistoryRecords(page, startDate, endDate)
+
+            // 恢复原始回调
+            continuation.invokeOnCancellation {
+                callback = originalCallback
+            }
         }
     }
 
