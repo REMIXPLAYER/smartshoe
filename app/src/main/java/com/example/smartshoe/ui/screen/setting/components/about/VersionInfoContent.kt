@@ -23,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.smartshoe.BuildConfig
 import com.example.smartshoe.R
 import com.example.smartshoe.ui.theme.AppColors
 
@@ -48,7 +49,7 @@ fun VersionInfoContent() {
             ) {
                 InfoRow(icon = R.drawable.icon_foot, label = "应用名称", value = "举足凝健")
                 HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
-                InfoRow(iconVector = Icons.Default.Info, label = "版本号", value = "v1.3.0")
+                InfoRow(iconVector = Icons.Default.Info, label = "版本号", value = "v${BuildConfig.VERSION_NAME}")
                 HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))
                 InfoRow(icon = R.drawable.cloud, label = "构建日期", value = "2026年4月")
                 HorizontalDivider(color = AppColors.LightGray.copy(alpha = 0.5f))

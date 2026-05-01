@@ -9,6 +9,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.smartshoe.BuildConfig
 import com.example.smartshoe.ui.screen.setting.components.common.GradientDivider
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppIcons
@@ -41,7 +42,7 @@ fun SettingsList(
             AboutAppItem(
                 appIcon = AppIcons.Info,
                 title = "版本信息",
-                subtitle = "v1.3.0",
+                subtitle = "v${BuildConfig.VERSION_NAME}",
                 isExpanded = isVersionExpanded,
                 onExpandedChange = onVersionExpandedChange
             ) {
