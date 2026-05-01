@@ -3,6 +3,7 @@ package com.example.smartshoe.ui.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smartshoe.domain.model.AiConversation
 import com.example.smartshoe.domain.model.AiStatusResult
 import com.example.smartshoe.domain.model.HealthAdviceResult
 import com.example.smartshoe.domain.model.SseConnectionState
@@ -10,12 +11,15 @@ import com.example.smartshoe.domain.model.SseEvent
 import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.domain.model.SensorDataRecord
 import com.example.smartshoe.domain.repository.AiAssistantRepository
+import com.example.smartshoe.domain.repository.AiConversationRepository
 import com.example.smartshoe.domain.repository.HistoryRecordRepository
+import com.example.smartshoe.domain.usecase.GenerateConversationTitleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -35,11 +39,14 @@ import javax.inject.Inject
 class AiAssistantViewModel @Inject constructor(
     val savedStateHandle: SavedStateHandle,
     private val aiAssistantRepository: AiAssistantRepository,
-    private val historyRecordRepository: HistoryRecordRepository
+    private val historyRecordRepository: HistoryRecordRepository,
+    private val conversationRepository: AiConversationRepository,
+    private val generateTitleUseCase: GenerateConversationTitleUseCase
 ) : ViewModel() {
 
     companion object {
         private const val KEY_WELCOME_INITIALIZED = "welcome_initialized"
+        private const val KEY_CURRENT_CONVERSATION_ID = "current_conversation_id"
     }
 
     // UI状态
@@ -58,7 +65,7 @@ class AiAssistantViewModel @Inject constructor(
     private val _enableThinking = MutableStateFlow(false)
     val enableThinking: StateFlow<Boolean> = _enableThinking.asStateFlow()
 
-    // 历史记录列表（用于选择）
+    // 历史记录列表（用于选择传感器数据）
     private val _historyRecords = MutableStateFlow<List<SensorDataRecord>>(emptyList())
     val historyRecords: StateFlow<List<SensorDataRecord>> = _historyRecords.asStateFlow()
 
@@ -78,16 +85,45 @@ class AiAssistantViewModel @Inject constructor(
 
     // 错误回调 - 使用WeakReference避免内存泄漏
     private var onErrorRef: WeakReference<((String) -> Unit)>? = null
-    
+
     var onError: ((String) -> Unit)?
         get() = onErrorRef?.get()
         set(value) {
             onErrorRef = value?.let { WeakReference(it) }
         }
 
+    // ==================== 多对话管理 ====================
+
+    // 当前对话ID
+    private val _currentConversationId = MutableStateFlow<String?>(null)
+    val currentConversationId: StateFlow<String?> = _currentConversationId.asStateFlow()
+
+    // 所有对话列表
+    private val _conversations = MutableStateFlow<List<AiConversation>>(emptyList())
+    val conversations: StateFlow<List<AiConversation>> = _conversations.asStateFlow()
+
+    // 对话列表加载状态
+    private val _isLoadingConversations = MutableStateFlow(false)
+    val isLoadingConversations: StateFlow<Boolean> = _isLoadingConversations.asStateFlow()
+
+    // 搜索关键词
+    private val _searchKeyword = MutableStateFlow("")
+    val searchKeyword: StateFlow<String> = _searchKeyword.asStateFlow()
+
+    // 是否显示对话抽屉
+    private val _showConversationDrawer = MutableStateFlow(false)
+    val showConversationDrawer: StateFlow<Boolean> = _showConversationDrawer.asStateFlow()
+
     init {
         checkAiStatus()
-        initWelcomeMessage()
+        loadConversations()
+        restoreOrCreateConversation()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        currentSseJob?.cancel()
+        currentSseJob = null
     }
 
     /**
@@ -311,6 +347,7 @@ class AiAssistantViewModel @Inject constructor(
     /**
      * 更新最后一条消息（用于流式更新）
      * 优化：使用 Mutex 保护，避免竞态条件
+     * 注意：流式消息不保存到数据库，只在内存中更新
      */
     private suspend fun updateLastMessage(message: ChatMessage) {
         messagesMutex.withLock {
@@ -325,8 +362,9 @@ class AiAssistantViewModel @Inject constructor(
     }
 
     /**
-     * 替换最后一条消息
+     * 替换最后一条消息（将流式消息替换为最终消息）
      * 优化：使用 Mutex 保护，避免竞态条件
+     * 替换后的最终消息会保存到数据库
      */
     private suspend fun replaceLastMessage(message: ChatMessage) {
         messagesMutex.withLock {
@@ -337,33 +375,172 @@ class AiAssistantViewModel @Inject constructor(
                     add(message)
                 }
                 _messages.value = newList
+
+                // 保存替换后的最终消息到数据库
+                if (message !is ChatMessage.StreamingAi) {
+                    _currentConversationId.value?.let { conversationId ->
+                        conversationRepository.saveMessage(conversationId, message)
+                        conversationRepository.updateConversationTime(conversationId)
+                    }
+                }
+            }
+        }
+    }
+
+    // ==================== 对话管理方法 ====================
+
+    /**
+     * 加载所有对话列表
+     * 在init中调用一次，建立Flow监听
+     */
+    private fun loadConversations() {
+        viewModelScope.launch {
+            conversationRepository.getAllConversations().collect { list ->
+                _conversations.value = list
             }
         }
     }
 
     /**
-     * 初始化欢迎消息（在ViewModel init中调用）
-     * 使用SavedStateHandle确保配置变化后不会重复添加
-     * 使用 Mutex 保护消息列表操作
+     * 恢复上次对话或创建新对话
+     * 优先级：
+     * 1. 恢复SavedState中保存的对话ID
+     * 2. 切换到数据库中最新对话
+     * 3. 创建新对话（首次使用）
      */
-    private fun initWelcomeMessage() {
-        // 检查是否已经初始化过（使用SavedStateHandle持久化）
-        val isWelcomeInitialized = savedStateHandle.get<Boolean>(KEY_WELCOME_INITIALIZED) ?: false
+    private fun restoreOrCreateConversation() {
+        viewModelScope.launch {
+            val savedId = savedStateHandle.get<String>(KEY_CURRENT_CONVERSATION_ID)
+            if (savedId != null) {
+                // 尝试恢复上次对话
+                switchToConversation(savedId)
+                return@launch
+            }
 
-        if (!isWelcomeInitialized && _messages.value.isEmpty()) {
-            viewModelScope.launch {
-                addMessage(ChatMessage.Ai(
+            // 没有保存的ID，检查数据库中是否已有对话
+            val existingConversations = conversationRepository.getAllConversations().first()
+            if (existingConversations.isNotEmpty()) {
+                // 切换到最新的对话（按更新时间排序的第一个）
+                val latestConversation = existingConversations.maxByOrNull { it.updatedAt }
+                latestConversation?.let {
+                    _currentConversationId.value = it.id
+                    savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = it.id
+                    val messageList = conversationRepository.getMessagesByConversationId(it.id).first()
+                    _messages.value = messageList
+                }
+            } else {
+                // 首次使用，创建新对话
+                createNewConversation()
+            }
+        }
+    }
+
+    /**
+     * 创建新对话
+     */
+    fun createNewConversation() {
+        viewModelScope.launch {
+            _isLoadingConversations.value = true
+            try {
+                val newId = conversationRepository.createConversation("新对话")
+                _currentConversationId.value = newId
+                savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = newId
+                _messages.value = emptyList()
+                // 添加欢迎消息（addMessage内部会保存到数据库）
+                val welcomeMessage = ChatMessage.Ai(
                     "👋 您好！我是您的足部健康AI助手。\n\n" +
                     "我可以通过分析您的智能鞋垫传感器数据，为您提供：\n" +
                     "• 📊 足部压力分布分析\n" +
                     "• ⚠️ 异常步态检测\n" +
                     "• 💡 个性化健康建议\n\n" +
-                    "请直接输入您的问题，或前往历史记录页面选择数据获取健康建议。",
+                    "请直接输入您的问题，或选择历史记录进行数据分析。",
                     "AI助手"
-                ))
+                )
+                addMessage(welcomeMessage)
+            } catch (e: Exception) {
+                onError?.invoke("创建对话失败: ${e.message}")
+            } finally {
+                _isLoadingConversations.value = false
             }
-            // 标记已初始化
-            savedStateHandle[KEY_WELCOME_INITIALIZED] = true
+        }
+    }
+
+    /**
+     * 切换到指定对话
+     * 使用first()只获取一次消息列表，避免无限挂起
+     */
+    fun switchToConversation(conversationId: String) {
+        viewModelScope.launch {
+            _isLoadingConversations.value = true
+            try {
+                _currentConversationId.value = conversationId
+                savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = conversationId
+                // 只收集一次消息列表
+                val messageList = conversationRepository.getMessagesByConversationId(conversationId).first()
+                _messages.value = messageList
+            } catch (e: Exception) {
+                onError?.invoke("切换对话失败: ${e.message}")
+            } finally {
+                _isLoadingConversations.value = false
+            }
+        }
+    }
+
+    /**
+     * 搜索对话
+     * 直接更新_conversations，不重复启动Flow collect
+     */
+    fun searchConversations(keyword: String) {
+        _searchKeyword.value = keyword
+        viewModelScope.launch {
+            try {
+                val list = if (keyword.isBlank()) {
+                    conversationRepository.getAllConversations().first()
+                } else {
+                    conversationRepository.searchConversations(keyword).first()
+                }
+                _conversations.value = list
+            } catch (e: Exception) {
+                onError?.invoke("搜索对话失败: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 删除对话
+     */
+    fun deleteConversation(conversationId: String) {
+        viewModelScope.launch {
+            try {
+                conversationRepository.deleteConversation(conversationId)
+                if (_currentConversationId.value == conversationId) {
+                    // 如果删除的是当前对话，切换到最新对话或创建新对话
+                    val remainingConversations = conversations.value.filter { it.id != conversationId }
+                    if (remainingConversations.isNotEmpty()) {
+                        switchToConversation(remainingConversations.first().id)
+                    } else {
+                        createNewConversation()
+                    }
+                }
+            } catch (e: Exception) {
+                onError?.invoke("删除对话失败: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 更新对话标题（基于第一条用户消息）
+     * 使用GenerateConversationTitleUseCase进行智能摘要
+     */
+    private fun updateConversationTitleFromMessage(content: String) {
+        val conversationId = _currentConversationId.value ?: return
+        viewModelScope.launch {
+            val title = generateTitleUseCase(content)
+            try {
+                conversationRepository.updateConversationTitle(conversationId, title)
+            } catch (e: Exception) {
+                // 静默处理，不影响主流程
+            }
         }
     }
 
@@ -424,6 +601,11 @@ class AiAssistantViewModel @Inject constructor(
         _connectionState.value = SseConnectionState.Idle
         currentSseJob?.cancel()
         currentSseJob = null
+        savedStateHandle.remove<String>(KEY_CURRENT_CONVERSATION_ID)
+        _currentConversationId.value = null
+        viewModelScope.launch {
+            conversationRepository.deleteAllConversations()
+        }
     }
 
     /**
@@ -431,8 +613,14 @@ class AiAssistantViewModel @Inject constructor(
      * 限制最大消息数，防止内存无限增长
      * 策略：保留第一条欢迎消息，移除最旧的用户/AI消息
      * 使用 Mutex 保护，避免竞态条件
+     * 同时保存到数据库（流式消息除外）
      */
     private suspend fun addMessage(message: ChatMessage) {
+        val currentId = _currentConversationId.value
+        val conversations = _conversations.value
+        val shouldUpdateTitle = message is ChatMessage.User &&
+            (conversations.find { it.id == currentId }?.title == "新对话")
+        
         messagesMutex.withLock {
             val currentList = _messages.value
             val newList = if (currentList.size >= AppConfig.AiAssistant.MAX_MESSAGE_COUNT) {
@@ -442,6 +630,19 @@ class AiAssistantViewModel @Inject constructor(
                 currentList + message
             }
             _messages.value = newList
+
+            // 保存到数据库（流式消息不保存，只保存最终状态）
+            if (message !is ChatMessage.StreamingAi) {
+                _currentConversationId.value?.let { conversationId ->
+                    conversationRepository.saveMessage(conversationId, message)
+                    conversationRepository.updateConversationTime(conversationId)
+                }
+            }
+        }
+        
+        // 在锁外异步更新标题，实现懒加载，不阻塞消息发送流程
+        if (shouldUpdateTitle) {
+            updateConversationTitleFromMessage(message.content)
         }
     }
 
@@ -485,24 +686,54 @@ class AiAssistantViewModel @Inject constructor(
     }
 
     /**
+     * 显示对话抽屉
+     */
+    fun showConversationDrawer() {
+        _showConversationDrawer.value = true
+    }
+
+    /**
+     * 隐藏对话抽屉
+     */
+    fun hideConversationDrawer() {
+        _showConversationDrawer.value = false
+    }
+
+    /**
      * 加载用户历史记录列表
      * 统一使用 HistoryRecordRepository 作为入口，与历史记录页面共享缓存
-     * 使用挂起函数等待异步加载完成，确保数据就绪后再更新UI
+     * 通过 Flow 观察 Repository 状态，确保数据就绪后再更新UI
      */
     fun loadHistoryRecords(token: String) {
         _isLoadingHistory.value = true
         viewModelScope.launch {
             try {
-                val records = historyRecordRepository.getHistoryRecordsAsync(
+                // 先收集一次当前记录列表
+                val currentRecords = historyRecordRepository.recordsFlow.value
+                if (currentRecords.isNotEmpty()) {
+                    _historyRecords.value = currentRecords
+                    _isLoadingHistory.value = false
+                    return@launch
+                }
+
+                // 若为空则触发查询
+                historyRecordRepository.queryHistoryRecords(
                     page = 0,
-                    size = 20,
+                    append = false,
                     startDate = null,
                     endDate = null
                 )
-                _historyRecords.value = records
+
+                // 等待加载完成并收集结果
+                historyRecordRepository.recordsFlow.collect { records ->
+                    if (records.isNotEmpty() || !historyRecordRepository.isLoadingFlow.value) {
+                        _historyRecords.value = records
+                        _isLoadingHistory.value = false
+                        return@collect
+                    }
+                }
             } catch (e: Exception) {
                 onError?.invoke("加载历史记录失败: ${e.message}")
-            } finally {
                 _isLoadingHistory.value = false
             }
         }

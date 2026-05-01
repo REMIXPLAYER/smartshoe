@@ -25,7 +25,7 @@ fun ExpandableArrowIcon(
     isExpanded: Boolean,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
-    tint: Color = AppColors.DarkGray,
+    tint: Color = AppColors.PlaceholderText,
     size: Dp = 20.dp,
     rotationDegrees: Float = 90f,
     useGraphicsLayer: Boolean = false

@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+  <!-- 对话气泡轮廓（不含+号） -->
+  <path
+      android:pathData="M96.7,881.2V227.6a130.8,130.8 0,0 1,130.8 -130.8h568.9a130.8,130.8 0,0 1,130.8 130.8v455.2a130.8,130.8 0,0 1,-130.8 130.8H265.8l-169.1,67.7zM0,940a56.9,56.9 0,0 0,78 52.8l206.4,-82.5h512A227.6,227.6 0,0 0,1024 682.6V227.6A227.6,227.6 0,0 0,796.4 0H227.6A227.6,227.6 0,0 0,0 227.6v712.4z"
+      android:fillColor="#1D2129"/>
+</vector>

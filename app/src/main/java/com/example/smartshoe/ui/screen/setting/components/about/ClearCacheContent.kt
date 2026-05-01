@@ -78,6 +78,7 @@ fun ClearCacheContent(onClearCache: () -> Unit) {
                 ClearCacheItem(icon = Icons.Default.Person, text = "用户登录信息")
                 ClearCacheItem(icon = R.drawable.bluetooth, text = "蓝牙设备列表")
                 ClearCacheItem(icon = R.drawable.history, text = "传感器历史数据")
+                ClearCacheItem(icon = R.drawable.aizhineng, text = "AI对话记录")
                 ClearCacheItem(icon = R.drawable.man, text = "体重设置")
                 ClearCacheItem(icon = R.drawable.analytics, text = "临时文件")
             }
@@ -119,7 +120,7 @@ fun ClearCacheItem(icon: Any, text: String) {
                 Icon(
                     painter = painterResource(icon),
                     contentDescription = null,
-                    tint = AppColors.DarkGray.copy(alpha = 0.7f),
+                    tint = AppColors.PlaceholderText.copy(alpha = 0.7f),
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -127,7 +128,7 @@ fun ClearCacheItem(icon: Any, text: String) {
                 Icon(
                     imageVector = icon as androidx.compose.ui.graphics.vector.ImageVector,
                     contentDescription = null,
-                    tint = AppColors.DarkGray.copy(alpha = 0.7f),
+                    tint = AppColors.PlaceholderText.copy(alpha = 0.7f),
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -136,7 +137,7 @@ fun ClearCacheItem(icon: Any, text: String) {
         Text(
             text = text,
             fontSize = 13.sp,
-            color = AppColors.DarkGray
+            color = AppColors.PlaceholderText
         )
     }
 }

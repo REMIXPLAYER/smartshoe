@@ -12,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.Calendar
 import java.util.Date
@@ -31,13 +32,25 @@ import com.example.smartshoe.ui.screen.MainScreen
 import com.example.smartshoe.ui.screen.main.MainScreenState
 import com.example.smartshoe.ui.screen.main.MainScreenCallbacks
 import com.example.smartshoe.ui.screen.main.SnackbarType
+import kotlinx.coroutines.launch
 
 
 /**
  * 主活动类，负责应用的生命周期管理和主要功能实现
  * 包含蓝牙连接、数据接收和UI显示等功能
- * 
+ *
  * 使用 Hilt 进行依赖注入，ViewModel 管理状态
+ *
+ * 重构后职责：
+ * - 权限检查与请求
+ * - ViewModel 初始化与状态收集
+ * - Compose UI 设置
+ * - 生命周期管理（onDestroy 资源释放）
+ *
+ * 不再承担：
+ * - 蓝牙数据中转（已下沉到 SensorDataViewModel）
+ * - 蓝牙错误 Toast 显示（已下沉到 SensorDataViewModel/Compose UI）
+ * - 蓝牙连接结果 Snackbar 显示（已下沉到 Compose UI）
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -51,15 +64,13 @@ class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
     private val settingViewModel: SettingViewModel by viewModels()
     private val aiAssistantViewModel: AiAssistantViewModel by viewModels()
+
     // 通过 Hilt 注入蓝牙连接管理器
     @Inject
     lateinit var bluetoothConnectionManager: BluetoothConnectionManager
 
     // 蓝牙权限请求码
     private val REQUEST_BLUETOOTH_PERMISSIONS = 1
-
-    // 压力提醒冷却时间
-    private var lastAlertTime = 0L
 
     // Snackbar 状态
     private var snackbarMessage: String? = null
@@ -77,55 +88,19 @@ class MainActivity : ComponentActivity() {
         var isMemoryLeakDetectorInitialized = false
     }
 
-    // 使用Dispatchers.IO替代自定义线程池，简化资源管理
-    // 蓝牙数据监听使用IO调度器，缓存清理由 CacheManager 处理
-
-
-
-
     /**
      * 应用创建时的初始化方法
      * 设置蓝牙适配器、请求权限、初始化UI
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         // 在 super.onCreate 之前配置窗口属性，确保无标题栏
-        // 方法1: 使用 NoActionBar 主题
-        // 方法2: 代码强制隐藏标题栏（针对某些手机厂商的定制系统）
-        
-        // 尝试多种方式隐藏标题栏
         requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-        
+
         super.onCreate(savedInstanceState)
 
-        // 初始化蓝牙连接管理器的回调
-        // 数据直接传递给 SensorDataViewModel 处理
-        bluetoothConnectionManager.onDataReceived = { data ->
-            sensorDataViewModel.processReceivedData(
-                data,
-                shouldRecord = bluetoothViewModel.connectedDevice.value != null
-            )
-        }
-        bluetoothConnectionManager.onError = { message ->
-            runOnUiThread {
-                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-            }
-        }
-        bluetoothConnectionManager.onConnectionResult = { success, errorMessage ->
-            runOnUiThread {
-                if (success) {
-                    showSnackbarMessage("蓝牙设备连接成功", SnackbarType.Success)
-                } else {
-                    showSnackbarMessage(errorMessage ?: "连接失败", SnackbarType.Error)
-                }
-            }
-        }
-
-        // 初始化历史记录ViewModel的回调
-        historyRecordViewModel.onError = { message ->
-            runOnUiThread {
-                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-            }
-        }
+        // 蓝牙数据流、错误和连接结果通过 Flow 直接传递到 SensorDataViewModel
+        // 历史记录错误通过 HistoryRecordViewModel.errorMessage Flow 暴露
+        // UI 通过 collectAsStateWithLifecycle 收集状态
 
         // 初始化内存泄漏检测器（应用级组件，从Application获取）
         // 只在首次启动时初始化一次，后续Activity不再重复初始化
@@ -137,9 +112,6 @@ class MainActivity : ComponentActivity() {
         // 初始化体重数据
         // 重构：通过 UserProfileViewModel 初始化，不再直接访问 LocalDataSource
         userProfileViewModel.initUserWeight()
-
-        // 初始化登录状态（AuthViewModel 会收集 AuthRepository 的 StateFlow）
-        // 不需要手动调用，AuthRepository 初始化时会自动加载状态
 
         // 初始化压力提醒设置
         // 重构：通过 SensorDataViewModel 初始化，不再直接访问 LocalDataSource
@@ -260,8 +232,8 @@ class MainActivity : ComponentActivity() {
                     aiAssistantViewModel?.analyzeRecord(recordId, authViewModel.tokenState.value ?: "")
                 },
                 // Snackbar
-                onSnackbarDismiss = { 
-                    snackbarMessage = null 
+                onSnackbarDismiss = {
+                    snackbarMessage = null
                 }
             )
 
@@ -271,8 +243,6 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
-
-
 
     /**
      * 显示 Snackbar 消息
@@ -310,7 +280,7 @@ class MainActivity : ComponentActivity() {
     /**
      * 清除所有应用缓存
      * 包括：业务数据、用户偏好设置、文件缓存
-     * 
+     *
      * 清理流程：
      * - 业务数据清理：由各 ViewModel 处理
      * - 文件缓存清理：由 CacheManager 处理
@@ -355,11 +325,6 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "清除缓存时出错", Toast.LENGTH_SHORT).show()
         }
     }
-
-
-
-
-
 
     /**
      * 检查并请求必要的蓝牙权限

@@ -72,7 +72,7 @@ fun DeviceListHeader(
 
     val subtitleColor = remember(connectedDevice?.address) {
         if (connectedDevice != null && connectedDevice.address != null)
-            AppColors.Success else AppColors.DarkGray
+            AppColors.Success else AppColors.PlaceholderText
     }
 
     Row(
@@ -110,7 +110,7 @@ fun DeviceListHeader(
 
         ExpandableArrowIcon(
             isExpanded = isExpanded,
-            tint = AppColors.DarkGray,
+            tint = AppColors.PlaceholderText,
             size = 20.dp,
             useGraphicsLayer = false
         )

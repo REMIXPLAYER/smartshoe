@@ -36,7 +36,7 @@ fun DeviceSettingsContent(
             Text(
                 text = "暂无可用设备，请确保蓝牙已开启",
                 fontSize = 14.sp,
-                color = AppColors.DarkGray,
+                color = AppColors.PlaceholderText,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         } else {

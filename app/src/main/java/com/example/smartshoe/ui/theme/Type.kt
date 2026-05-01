@@ -41,6 +41,15 @@ object AppDimensions {
     // 卡片圆角
     val CardCornerRadius = 12.dp                 // 卡片圆角
     val ButtonCornerRadius = 8.dp                // 按钮圆角
+    val DialogCornerRadius = 16.dp               // 对话框圆角
+    val InputCornerRadius = 8.dp                 // 输入框圆角
+    val SmallCornerRadius = 4.dp                 // 小圆角（标签等）
+
+    // 阴影高度
+    val CardElevation = 4.dp                     // 卡片阴影
+    val DialogElevation = 2.dp                   // 对话框阴影
+    val ButtonElevation = 2.dp                   // 按钮阴影
+    val NoneElevation = 0.dp                     // 无阴影
 
     // 传感器可视化
     val ImageScale = 1.8f                        // 鞋垫图片缩放比例

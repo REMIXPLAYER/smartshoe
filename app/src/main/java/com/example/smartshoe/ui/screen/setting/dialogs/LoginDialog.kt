@@ -150,7 +150,7 @@ fun LoginDialog(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("还没有账户？", fontSize = 14.sp, color = AppColors.DarkGray)
+                    Text("还没有账户？", fontSize = 14.sp, color = AppColors.PlaceholderText)
                     TextButton(onClick = onSwitchToRegister) {
                         Text("立即注册", color = AppColors.Primary, fontSize = 14.sp)
                     }
@@ -160,7 +160,7 @@ fun LoginDialog(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("取消", color = AppColors.DarkGray)
+                    Text("取消", color = AppColors.PlaceholderText)
                 }
             }
         }

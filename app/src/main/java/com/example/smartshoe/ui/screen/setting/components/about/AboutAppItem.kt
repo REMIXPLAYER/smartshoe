@@ -108,7 +108,7 @@ fun AboutAppItem(
                 Text(
                     text = subtitle,
                     fontSize = 12.sp,
-                    color = AppColors.DarkGray
+                    color = AppColors.PlaceholderText
                 )
             }
 
@@ -125,7 +125,7 @@ fun AboutAppItem(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = if (isExpanded) "收起" else "展开",
-                tint = if (isExpanded) AppColors.Primary else AppColors.DarkGray,
+                tint = if (isExpanded) AppColors.Primary else AppColors.PlaceholderText,
                 modifier = Modifier
                     .size(20.dp)
                     .rotate(arrowRotation)

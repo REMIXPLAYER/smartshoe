@@ -99,7 +99,7 @@ fun EditProfileDialog(
                     Icon(
                         imageVector = Icons.Default.Email,
                         contentDescription = null,
-                        tint = AppColors.DarkGray,
+                        tint = AppColors.PlaceholderText,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
@@ -107,7 +107,7 @@ fun EditProfileDialog(
                         Text(
                             text = "邮箱地址",
                             fontSize = 12.sp,
-                            color = AppColors.DarkGray
+                            color = AppColors.PlaceholderText
                         )
                         Text(
                             text = userState.email,
@@ -166,7 +166,7 @@ fun EditProfileDialog(
                 Text(
                     text = "提示：修改资料需要输入当前密码验证",
                     fontSize = 12.sp,
-                    color = AppColors.DarkGray
+                    color = AppColors.PlaceholderText
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
@@ -195,7 +195,7 @@ fun EditProfileDialog(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("取消", color = AppColors.DarkGray)
+                    Text("取消", color = AppColors.PlaceholderText)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

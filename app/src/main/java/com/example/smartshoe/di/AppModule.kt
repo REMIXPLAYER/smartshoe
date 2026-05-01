@@ -3,6 +3,8 @@ package com.example.smartshoe.di
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import androidx.room.Room
+import com.example.smartshoe.data.local.AppDatabase
 import com.example.smartshoe.data.local.LocalDataSource
 import com.example.smartshoe.data.local.SharedPreferencesDataSource
 import com.example.smartshoe.data.remote.AiAssistantApiService
@@ -95,6 +97,31 @@ abstract class AppModule {
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
         }
+
+        /**
+         * 提供Room数据库
+         */
+        @Provides
+        @Singleton
+        fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+            return Room.databaseBuilder(
+                context,
+                AppDatabase::class.java,
+                AppDatabase.DATABASE_NAME
+            ).build()
+        }
+
+        /**
+         * 提供AI对话DAO
+         */
+        @Provides
+        fun provideAiConversationDao(database: AppDatabase) = database.aiConversationDao()
+
+        /**
+         * 提供AI消息DAO
+         */
+        @Provides
+        fun provideAiMessageDao(database: AppDatabase) = database.aiMessageDao()
 
         // UserPreferencesManager 使用 @Inject 构造函数，Hilt 会自动处理
         // 不需要手动提供

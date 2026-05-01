@@ -99,7 +99,7 @@ fun WeightSettingsContent(
                     Icon(
                         painter = painterResource(R.drawable.close),
                         contentDescription = "取消",
-                        tint = AppColors.DarkGray,
+                        tint = AppColors.PlaceholderText,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -119,7 +119,7 @@ fun WeightSettingsContent(
                     text = if (userWeight > 0) "${userWeight} kg" else "未设置",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (userWeight > 0) AppColors.Primary else AppColors.DarkGray
+                    color = if (userWeight > 0) AppColors.Primary else AppColors.PlaceholderText
                 )
             }
         }

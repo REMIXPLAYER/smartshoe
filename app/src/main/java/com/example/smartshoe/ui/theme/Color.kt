@@ -50,7 +50,11 @@ object AppColors {
     // 通用UI颜色
     val LightGray = Color(0xFFEEEEEE)            // 浅灰色（分隔线等）
     val MediumGray = Color(0xFF666666)           // 中灰色（次要文字）
-    val DarkGray = Color.Gray                    // 深灰色
+    val DarkGray = Color(0xFF424242)             // 深灰色（主文字、标题）
+    val PlaceholderText = Color(0xFF9E9E9E)      // 占位符文字（浅灰）
+    val DividerColor = Color(0xFFE0E0E0)         // 分隔线颜色
+    val CardBackground = Color(0xFFFFFFFF)       // 卡片背景色
+    val DisabledText = Color(0xFFBDBDBD)         // 禁用状态文字
 
     // AI模式颜色（方案B：蓝紫对比）
     val AiModeDeep = Color(0xFF7C4DFF)           // 深度思考模式 - 明亮紫

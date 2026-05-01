@@ -163,7 +163,7 @@ fun DrawScope.drawSensor(
 
     drawPath(
         path = path,
-        color = Color.Gray.copy(alpha = AppDimensions.SensorBorderAlpha),
+        color = AppColors.MediumGray.copy(alpha = AppDimensions.SensorBorderAlpha),
         style = Stroke(width = AppDimensions.SensorBorderWidth)
     )
 }

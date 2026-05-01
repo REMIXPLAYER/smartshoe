@@ -43,13 +43,10 @@ class BluetoothViewModel @Inject constructor(
     val connectingDeviceAddress: StateFlow<String?> = bluetoothConnectionManager.connectingDeviceAddress
 
     init {
-        // 使用SavedStateHandle避免配置变更时重复设置回调
-        val isCallbackSet = savedStateHandle.get<Boolean>(KEY_ERROR_CALLBACK_SET) ?: false
-        if (!isCallbackSet) {
-            // 将 Manager 的错误转发到 ViewModel
-            bluetoothConnectionManager.onError = { message ->
-                // 可以通过 StateFlow 或其他方式暴露给 UI
-            }
+        // 蓝牙错误和连接结果通过 Flow 暴露，无需设置回调
+        // 保留 SavedStateHandle 的 key 以避免配置变更时重复收集 Flow
+        val isFlowCollected = savedStateHandle.get<Boolean>(KEY_ERROR_CALLBACK_SET) ?: false
+        if (!isFlowCollected) {
             savedStateHandle[KEY_ERROR_CALLBACK_SET] = true
         }
     }
@@ -103,10 +100,7 @@ class BluetoothViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        // 清理回调，防止内存泄漏
-        bluetoothConnectionManager.onError = null
-        bluetoothConnectionManager.onDataReceived = null
-        
+        // Flow 无需手动清理，协程作用域自动管理
         // 断开蓝牙连接，释放资源
         disconnectDevice()
     }

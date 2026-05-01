@@ -10,8 +10,11 @@ import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.di.ApplicationScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.InputStream
 import java.util.*
@@ -21,9 +24,14 @@ import javax.inject.Singleton
 /**
  * 蓝牙连接管理器
  * 负责蓝牙设备的扫描、连接、数据监听
- * 
+ *
  * 遵循 Clean Architecture 原则，将蓝牙连接逻辑从 Activity 中分离
  * 使用 @ApplicationScope 确保协程作用域在应用生命周期内有效
+ *
+ * 数据流向（重构后）：
+ * 硬件 → BluetoothSocket → inputStream.read() → 原始字符串
+ * → dataChannel.trySend() → dispatchJob → _rawDataFlow.emit()
+ * → SensorDataViewModel.collect() → SensorDataRepository.processReceivedData()
  */
 @Singleton
 class BluetoothConnectionManager @Inject constructor(
@@ -59,22 +67,34 @@ class BluetoothConnectionManager @Inject constructor(
     private val _connectingDeviceAddress = MutableStateFlow<String?>(null)
     val connectingDeviceAddress: StateFlow<String?> = _connectingDeviceAddress.asStateFlow()
 
-    // 数据接收回调
-    var onDataReceived: ((String) -> Unit)? = null
+    // 蓝牙错误状态流（替代 onError 回调）
+    private val _errorFlow = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    val errorFlow: SharedFlow<String> = _errorFlow.asSharedFlow()
 
-    // 错误回调
-    var onError: ((String) -> Unit)? = null
+    // 蓝牙连接结果流（替代 onConnectionResult 回调）
+    private val _connectionResultFlow = MutableSharedFlow<Pair<Boolean, String?>>(extraBufferCapacity = 16)
+    val connectionResultFlow: SharedFlow<Pair<Boolean, String?>> = _connectionResultFlow.asSharedFlow()
 
-    // 连接结果回调
-    var onConnectionResult: ((Boolean, String?) -> Unit)? = null
+    // 原始蓝牙数据帧流（替代 onDataReceived 回调）
+    private val _rawDataFlow = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    val rawDataFlow: SharedFlow<String> = _rawDataFlow.asSharedFlow()
 
-    // 蓝牙数据通道 - 用于背压控制
-    private val dataChannel = Channel<String>(Channel.BUFFERED)
+    // 蓝牙数据通道 - 用于协程间数据传递（内部使用，不直接暴露）
+    private val dataChannel = Channel<String>(Channel.CONFLATED)
+
+    // 最后收到数据的时间戳（用于连接保活）
+    // 使用 @Volatile 确保多线程可见性（readJob 写，keepaliveJob 读）
+    @Volatile
+    private var lastDataTime = 0L
 
     companion object {
         private const val TAG = "BluetoothConnManager"
         // 使用 AppConfig 中的 UUID
         private val SPP_UUID: UUID = UUID.fromString(AppConfig.Bluetooth.SPP_UUID)
+        // 连接保活超时：10秒未收到数据认为连接已断开
+        private const val CONNECTION_KEEPALIVE_TIMEOUT_MS = 10000L
+        // 保活检测间隔
+        private const val KEEPALIVE_CHECK_INTERVAL_MS = 5000L
     }
 
     /**
@@ -84,7 +104,7 @@ class BluetoothConnectionManager @Inject constructor(
     @SuppressLint("MissingPermission")
     fun scanDevices() {
         if (bluetoothAdapter?.isEnabled != true) {
-            onError?.invoke("蓝牙未开启")
+            emitError("蓝牙未开启")
             return
         }
 
@@ -101,7 +121,7 @@ class BluetoothConnectionManager @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error scanning devices: ${e.message}")
-                onError?.invoke("扫描设备失败: ${e.message}")
+                emitError("扫描设备失败: ${e.message}")
             } finally {
                 _isScanning.value = false
             }
@@ -119,8 +139,8 @@ class BluetoothConnectionManager @Inject constructor(
     suspend fun connectDevice(device: BluetoothDevice): Boolean = withContext(Dispatchers.IO) {
         // 检查蓝牙适配器状态
         if (bluetoothAdapter?.isEnabled != true) {
-            onError?.invoke("蓝牙未开启")
-            onConnectionResult?.invoke(false, "蓝牙未开启")
+            emitError("蓝牙未开启")
+            emitConnectionResult(false, "蓝牙未开启")
             return@withContext false
         }
 
@@ -128,18 +148,18 @@ class BluetoothConnectionManager @Inject constructor(
         synchronized(connectionLock) {
             if (_isConnecting.value) {
                 Log.w(TAG, "Already connecting to a device, please wait")
-                onError?.invoke("正在连接其他设备，请稍候")
-                onConnectionResult?.invoke(false, "正在连接其他设备，请稍候")
+                emitError("正在连接其他设备，请稍候")
+                emitConnectionResult(false, "正在连接其他设备，请稍候")
                 return@withContext false
             }
-            
+
             // 检查是否已经连接到该设备
             if (_connectedDevice.value?.address == device.address) {
                 Log.w(TAG, "Already connected to this device")
-                onConnectionResult?.invoke(true, null)
+                emitConnectionResult(true, null)
                 return@withContext true
             }
-            
+
             _isConnecting.value = true
             _connectingDeviceAddress.value = device.address
         }
@@ -172,8 +192,8 @@ class BluetoothConnectionManager @Inject constructor(
                 connectJob.cancel()
                 closeSocketSafely(socket)
                 Log.e(TAG, "Connection timeout")
-                onError?.invoke("连接超时，请重试")
-                onConnectionResult?.invoke(false, "连接超时，请重试")
+                emitError("连接超时，请重试")
+                emitConnectionResult(false, "连接超时，请重试")
                 return@withContext false
             }
 
@@ -181,8 +201,8 @@ class BluetoothConnectionManager @Inject constructor(
             if (!socket.isConnected) {
                 closeSocketSafely(socket)
                 Log.e(TAG, "Socket not connected after connect()")
-                onError?.invoke("连接失败")
-                onConnectionResult?.invoke(false, "连接失败")
+                emitError("连接失败")
+                emitConnectionResult(false, "连接失败")
                 return@withContext false
             }
 
@@ -192,16 +212,19 @@ class BluetoothConnectionManager @Inject constructor(
             // 更新连接状态
             _connectedDevice.value = device
 
+            // 重置保活时间戳
+            lastDataTime = System.currentTimeMillis()
+
             // 开始数据监听
             startDataListening(device.address, socket)
 
             Log.d(TAG, "Connected to device: ${device.name} (${device.address})")
-            onConnectionResult?.invoke(true, null)
+            emitConnectionResult(true, null)
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error connecting to device: ${e.message}")
-            onError?.invoke("连接失败: ${e.message}")
-            onConnectionResult?.invoke(false, "连接失败: ${e.message}")
+            emitError("连接失败: ${e.message}")
+            emitConnectionResult(false, "连接失败: ${e.message}")
             false
         } finally {
             synchronized(connectionLock) {
@@ -229,6 +252,7 @@ class BluetoothConnectionManager @Inject constructor(
         _connectedDevice.value?.let { device ->
             resourceManager.releaseDeviceResources(device.address)
             resourceManager.releaseDeviceResources(device.address + "_dispatch")
+            resourceManager.releaseDeviceResources(device.address + "_keepalive")
             _connectedDevice.value = null
             Log.d(TAG, "Disconnected from device: ${device.address}")
         }
@@ -236,7 +260,7 @@ class BluetoothConnectionManager @Inject constructor(
 
     /**
      * 开始监听蓝牙数据
-     * 优化：使用 Channel 进行背压控制，避免高频数据导致内存泄漏
+     * 优化：使用 CONFLATED Channel 避免背压阻塞，增加连接保活
      */
     private fun startDataListening(deviceAddress: String, socket: BluetoothSocket) {
         // 启动数据读取协程
@@ -252,8 +276,15 @@ class BluetoothConnectionManager @Inject constructor(
                     try {
                         bytes = inputStream.read(buffer)
                         if (bytes > 0) {
+                            // 更新最后收到数据的时间戳
+                            lastDataTime = System.currentTimeMillis()
+
                             val data = String(buffer, 0, bytes)
-                            dataChannel.send(data)
+                            // 使用 trySend 避免 Channel 满时阻塞读取协程
+                            val result = dataChannel.trySend(data)
+                            if (!result.isSuccess) {
+                                Log.w(TAG, "Data channel full, dropping data")
+                            }
                         }
                     } catch (e: Exception) {
                         if (!isActive) {
@@ -261,7 +292,7 @@ class BluetoothConnectionManager @Inject constructor(
                             break
                         }
                         Log.e(TAG, "Error reading data: ${e.message}")
-                        onError?.invoke("数据读取错误: ${e.message}")
+                        emitError("数据读取错误: ${e.message}")
                         break
                     }
                 }
@@ -271,18 +302,18 @@ class BluetoothConnectionManager @Inject constructor(
                     return@launch
                 }
                 Log.e(TAG, "Error in data listening: ${e.message}")
-                onError?.invoke("数据监听错误: ${e.message}")
+                emitError("数据监听错误: ${e.message}")
             } finally {
                 Log.d(TAG, "Data listening ended for device: $deviceAddress")
             }
         }
 
-        // 启动数据分发协程 - 通过 Channel 消费数据，实现背压控制
+        // 启动数据分发协程 - 通过 Channel 消费数据，转发到 SharedFlow
         val dispatchJob = connectionScope.launch {
             try {
                 for (data in dataChannel) {
                     if (!isActive) break
-                    onDataReceived?.invoke(data)
+                    _rawDataFlow.emit(data)
                 }
             } catch (e: Exception) {
                 if (!isActive) {
@@ -293,8 +324,51 @@ class BluetoothConnectionManager @Inject constructor(
             }
         }
 
+        // 启动连接保活协程
+        val keepaliveJob = connectionScope.launch {
+            try {
+                while (isActive && socket.isConnected) {
+                    delay(KEEPALIVE_CHECK_INTERVAL_MS)
+                    val timeSinceLastData = System.currentTimeMillis() - lastDataTime
+                    if (timeSinceLastData > CONNECTION_KEEPALIVE_TIMEOUT_MS) {
+                        Log.w(TAG, "No data for ${timeSinceLastData}ms, connection may be dead")
+                        emitError("连接无响应，请重新连接")
+                        disconnectDevice()
+                        break
+                    }
+                }
+            } catch (e: Exception) {
+                if (!isActive) {
+                    Log.d(TAG, "Keepalive check cancelled for device: $deviceAddress")
+                    return@launch
+                }
+                Log.e(TAG, "Error in keepalive check: ${e.message}")
+            }
+        }
+
         resourceManager.registerJob(deviceAddress, readJob)
         resourceManager.registerJob(deviceAddress + "_dispatch", dispatchJob)
+        resourceManager.registerJob(deviceAddress + "_keepalive", keepaliveJob)
+    }
+
+    /**
+     * 发送错误到错误流（线程安全）
+     */
+    private fun emitError(message: String) {
+        val result = _errorFlow.tryEmit(message)
+        if (!result) {
+            Log.w(TAG, "Error flow buffer full, dropping error: $message")
+        }
+    }
+
+    /**
+     * 发送连接结果到结果流（线程安全）
+     */
+    private fun emitConnectionResult(success: Boolean, message: String?) {
+        val result = _connectionResultFlow.tryEmit(Pair(success, message))
+        if (!result) {
+            Log.w(TAG, "Connection result flow buffer full")
+        }
     }
 
     /**
@@ -310,19 +384,15 @@ class BluetoothConnectionManager @Inject constructor(
      * 只清理当前连接相关的资源和回调
      */
     fun releaseAllResources() {
-        // 清理回调，防止内存泄漏
-        onDataReceived = null
-        onError = null
-        
         // 断开当前连接
         disconnectDevice()
-        
+
         // 释放资源管理器中的所有资源
         resourceManager.releaseAllResources()
-        
+
         // 注意：不取消 connectionScope，因为它是应用级别的
         // 由 Hilt 管理的 @ApplicationScope 协程作用域会在应用结束时自动清理
-        
+
         Log.d(TAG, "All resources released (connection scope preserved)")
     }
 }

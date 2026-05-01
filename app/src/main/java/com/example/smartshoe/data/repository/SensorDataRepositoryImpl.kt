@@ -62,36 +62,43 @@ class SensorDataRepositoryImpl @Inject constructor() : SensorDataRepository {
      * @return Pair<传感器数值, 额外数值> 或 null 如果解析失败
      */
     override fun processReceivedData(data: String, shouldRecord: Boolean): Pair<List<Int>, List<Int>>? {
-        val hexValues = data.trim().split(",")
-        if (hexValues.size >= 6) {
+        // 清理非法字符，只保留十六进制字符和逗号
+        val cleaned = data.replace(Regex("[^0-9A-Fa-f,]"), "")
+
+        val hexValues = cleaned.split(",")
+        if (hexValues.size != 6) {
+            Log.w(TAG, "Invalid frame format: expected 6 values, got ${hexValues.size}, data='$data'")
+            return null
+        }
+
+        val values = mutableListOf<Int>()
+        for ((index, hex) in hexValues.withIndex()) {
             try {
-                val values = hexValues.take(3).map { it.toInt(16) }.toMutableList()
-                var extras = hexValues.takeLast(3).map { it.toInt(16) }.toMutableList()
-
-                // 传感器3替代方案：传感器3 = 传感器2 * MULTIPLIER / DIVISOR
-                if (AppConfig.Sensor.SENSOR3_USE_CALCULATED_VALUE) {
-                    val calculatedSensor3 = (extras[1] * AppConfig.Sensor.SENSOR3_MULTIPLIER / AppConfig.Sensor.SENSOR3_DIVISOR)
-                        .coerceIn(0, AppConfig.Sensor.SENSOR_MAX_VALUE)
-                    extras[2] = calculatedSensor3
-                    // 同时更新 values 数组（如果蓝牙数据中的 values 也需要更新）
-                    if (values.size >= 3) {
-                        values[2] = calculatedSensor3
-                    }
-                }
-
-                // 更新滑动窗口并计算加权平均
-                updateSlidingWindowAndCalculate(extras[0], extras[1], extras[2])
-
-                if (shouldRecord) {
-                    autoRecordData(extras[0], extras[1], extras[2])
-                }
-
-                return Pair(values, extras)
+                values.add(hex.toInt(16))
             } catch (e: NumberFormatException) {
-                Log.e(TAG, "Error parsing sensor data: ${e.message}", e)
+                Log.e(TAG, "Invalid hex at index $index: '$hex' in data='$data'")
+                return null
             }
         }
-        return null
+
+        // 值域校验（12位ADC，0-4095）
+        if (values.any { it < 0 || it > AppConfig.Sensor.SENSOR_MAX_VALUE }) {
+            Log.w(TAG, "Value out of range (0-${AppConfig.Sensor.SENSOR_MAX_VALUE}): $values")
+            return null
+        }
+
+        val extras = values.toMutableList()
+
+        // 三个传感器统一处理，不再对传感器3做特殊补偿
+        updateSlidingWindowAndCalculate(extras[0], extras[1], extras[2])
+
+        // 记录数据到缓冲区
+        if (shouldRecord) {
+            autoRecordData(extras[0], extras[1], extras[2])
+        }
+
+        val displayValues = listOf(extras[0], extras[1], extras[2])
+        return Pair(displayValues, displayValues)
     }
 
     /**

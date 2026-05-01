@@ -32,7 +32,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://82.156.18.21:8080/api\""
+                "\"http://10.0.2.2:8080/api\""
                 //http://10.0.2.2:8080/api
             )
         }
@@ -123,4 +123,9 @@ dependencies {
 
     // Markdown 渲染支持
     implementation("com.github.jeziellago:compose-markdown:0.5.0")
+
+    // Room 数据库
+    implementation("androidx.room:room-runtime:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
 }

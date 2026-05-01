@@ -10,11 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,6 +27,11 @@ import com.example.smartshoe.ui.viewmodel.UploadStatus
 
 /**
  * 设置页面主入口
+ *
+ * 重构后：
+ * - AboutAppSection 展开状态从 rememberSaveable 迁移到 SettingViewModel
+ * - HTTP 错误解析从 LaunchedEffect 下沉到 SettingViewModel.handleAuthError()
+ * - UI 层只负责收集状态和触发事件
  */
 object SettingScreen {
     /**
@@ -63,80 +63,27 @@ object SettingScreen {
         onShowError: ((String) -> Unit)? = null,
         authUiState: AuthUiState = AuthUiState.Idle
     ) {
-        // 对话框状态
+        // 对话框状态 - 来自 ViewModel
         val showLoginDialog = settingViewModel?.showLoginDialog?.collectAsStateWithLifecycle()?.value ?: false
         val showRegisterDialog = settingViewModel?.showRegisterDialog?.collectAsStateWithLifecycle()?.value ?: false
         val isEditProfileExpanded = settingViewModel?.isEditProfileExpanded?.collectAsStateWithLifecycle()?.value ?: false
         val uploadStatus = settingViewModel?.uploadStatus?.collectAsStateWithLifecycle()?.value ?: UploadStatus.IDLE
         val errorMessage = settingViewModel?.errorMessage?.collectAsStateWithLifecycle()?.value
 
-        // AboutAppSection 展开状态
-        var isVersionExpanded by rememberSaveable { mutableStateOf(false) }
-        var isHelpExpanded by rememberSaveable { mutableStateOf(false) }
-        var isPrivacyExpanded by rememberSaveable { mutableStateOf(false) }
-        var isClearCacheExpanded by rememberSaveable { mutableStateOf(false) }
+        // AboutAppSection 展开状态 - 来自 ViewModel（统一状态管理）
+        val isVersionExpanded = settingViewModel?.isVersionExpanded?.collectAsStateWithLifecycle()?.value ?: false
+        val isHelpExpanded = settingViewModel?.isHelpExpanded?.collectAsStateWithLifecycle()?.value ?: false
+        val isPrivacyExpanded = settingViewModel?.isPrivacyExpanded?.collectAsStateWithLifecycle()?.value ?: false
+        val isClearCacheExpanded = settingViewModel?.isClearCacheExpanded?.collectAsStateWithLifecycle()?.value ?: false
 
-        // 处理认证状态
+        // 处理认证状态 - 错误解析已下沉到 ViewModel
         LaunchedEffect(authUiState) {
             when (authUiState) {
                 is AuthUiState.Success -> {
                     settingViewModel?.handleAuthCompleted(success = true)
                 }
                 is AuthUiState.Error -> {
-                    val authErrorMessage = authUiState.message
-                    // 根据 HTTP 状态码和错误消息统一处理登录错误
-                    // 错误格式可能是 "[401] 登录失败" 或纯文本消息
-                    val httpCodeRegex = Regex("\\[(\\d+)]")
-                    val httpCode = httpCodeRegex.find(authErrorMessage)?.groupValues?.get(1)?.toIntOrNull()
-                    val cleanMessage = authErrorMessage.replace(httpCodeRegex, "").trim()
-
-                    when {
-                        // HTTP 401 - 未授权（账号或密码错误）
-                        httpCode == 401 -> {
-                            settingViewModel?.setLoginError(
-                                message = "邮箱或密码错误",
-                                field = com.example.smartshoe.ui.viewmodel.SettingViewModel.LoginErrorField.BOTH
-                            )
-                        }
-                        // HTTP 403 - 禁止访问（账户被禁用）
-                        httpCode == 403 -> {
-                            settingViewModel?.setLoginError(
-                                message = "账户已被禁用",
-                                field = com.example.smartshoe.ui.viewmodel.SettingViewModel.LoginErrorField.BOTH
-                            )
-                        }
-                        // HTTP 4xx - 客户端错误（请求格式问题等）
-                        httpCode != null && httpCode in 400..499 -> {
-                            settingViewModel?.setLoginError(
-                                message = cleanMessage.ifEmpty { "请求参数错误" },
-                                field = com.example.smartshoe.ui.viewmodel.SettingViewModel.LoginErrorField.BOTH
-                            )
-                        }
-                        // HTTP 5xx - 服务器错误
-                        httpCode != null && httpCode in 500..599 -> {
-                            settingViewModel?.setLoginError(
-                                message = "服务器错误，请稍后重试",
-                                field = null
-                            )
-                        }
-                        // 网络连接错误
-                        cleanMessage.contains("连接", ignoreCase = true) ||
-                        cleanMessage.contains("网络", ignoreCase = true) ||
-                        cleanMessage.contains("timeout", ignoreCase = true) ||
-                        cleanMessage.contains("无法连接", ignoreCase = true) -> {
-                            settingViewModel?.setLoginError(
-                                message = "网络连接失败，请检查网络设置",
-                                field = null
-                            )
-                        }
-                        // 其他未知错误
-                        else -> {
-                            settingViewModel?.setLoginError(
-                                message = cleanMessage.ifEmpty { "登录失败，请稍后重试" },
-                                field = null
-                            )
-                        }
-                    }
+                    settingViewModel?.handleAuthError(authUiState.message)
                     settingViewModel?.handleAuthCompleted(success = false)
                 }
                 else -> {}
@@ -146,7 +93,7 @@ object SettingScreen {
         // 显示全局错误
         errorMessage?.let { message ->
             onShowError?.invoke(message)
-            settingViewModel.clearError()
+            settingViewModel?.clearError()
         }
 
         LazyColumn(
@@ -204,23 +151,15 @@ object SettingScreen {
 
             // 关于应用区
             item {
-                // 互斥展开：展开一项时自动收起其他项
-                fun expandOnly(target: String) {
-                    isVersionExpanded = target == "version"
-                    isHelpExpanded = target == "help"
-                    isPrivacyExpanded = target == "privacy"
-                    isClearCacheExpanded = target == "clearCache"
-                }
-
                 SettingsList(
                     isVersionExpanded = isVersionExpanded,
                     isHelpExpanded = isHelpExpanded,
                     isPrivacyExpanded = isPrivacyExpanded,
                     isClearCacheExpanded = isClearCacheExpanded,
-                    onVersionExpandedChange = { expandOnly(if (it) "version" else "") },
-                    onHelpExpandedChange = { expandOnly(if (it) "help" else "") },
-                    onPrivacyExpandedChange = { expandOnly(if (it) "privacy" else "") },
-                    onClearCacheExpandedChange = { expandOnly(if (it) "clearCache" else "") },
+                    onVersionExpandedChange = { settingViewModel?.expandOnly(if (it) "version" else "") },
+                    onHelpExpandedChange = { settingViewModel?.expandOnly(if (it) "help" else "") },
+                    onPrivacyExpandedChange = { settingViewModel?.expandOnly(if (it) "privacy" else "") },
+                    onClearCacheExpandedChange = { settingViewModel?.expandOnly(if (it) "clearCache" else "") },
                     onClearCache = onClearCache
                 )
             }
@@ -259,7 +198,7 @@ object SettingScreen {
         // 编辑资料对话框
         if (isEditProfileExpanded && userState.isLoggedIn) {
             // 初始化编辑表单
-            androidx.compose.runtime.LaunchedEffect(Unit) {
+            LaunchedEffect(Unit) {
                 settingViewModel?.initEditProfileForm(userState)
             }
 

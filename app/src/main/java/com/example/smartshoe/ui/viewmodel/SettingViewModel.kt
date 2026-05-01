@@ -126,6 +126,19 @@ class SettingViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // ==================== AboutAppSection 展开状态 ====================
+    private val _isVersionExpanded = MutableStateFlow(false)
+    val isVersionExpanded: StateFlow<Boolean> = _isVersionExpanded.asStateFlow()
+
+    private val _isHelpExpanded = MutableStateFlow(false)
+    val isHelpExpanded: StateFlow<Boolean> = _isHelpExpanded.asStateFlow()
+
+    private val _isPrivacyExpanded = MutableStateFlow(false)
+    val isPrivacyExpanded: StateFlow<Boolean> = _isPrivacyExpanded.asStateFlow()
+
+    private val _isClearCacheExpanded = MutableStateFlow(false)
+    val isClearCacheExpanded: StateFlow<Boolean> = _isClearCacheExpanded.asStateFlow()
+
     // ==================== 清除缓存确认对话框 ====================
     private val _showClearCacheConfirm = MutableStateFlow(false)
     val showClearCacheConfirm: StateFlow<Boolean> = _showClearCacheConfirm.asStateFlow()
@@ -417,6 +430,19 @@ class SettingViewModel @Inject constructor(
         _isEditProfileLoading.value = loading
     }
 
+    // ==================== AboutAppSection 展开状态管理 ====================
+
+    /**
+     * 展开指定项，自动收起其他项（互斥展开）
+     * @param target 要展开的项："version" | "help" | "privacy" | "clearCache" | ""
+     */
+    fun expandOnly(target: String) {
+        _isVersionExpanded.value = target == "version"
+        _isHelpExpanded.value = target == "help"
+        _isPrivacyExpanded.value = target == "privacy"
+        _isClearCacheExpanded.value = target == "clearCache"
+    }
+
     // ==================== 认证状态处理 ====================
 
     /**
@@ -434,6 +460,39 @@ class SettingViewModel @Inject constructor(
         _isLoginLoading.value = false
         _isRegisterLoading.value = false
         _isEditProfileLoading.value = false
+    }
+
+    /**
+     * 处理认证错误，将 HTTP 状态码和错误消息映射为用户友好消息
+     * @param authErrorMessage 原始错误消息（格式如 "[401] 登录失败" 或纯文本）
+     */
+    fun handleAuthError(authErrorMessage: String) {
+        val httpCodeRegex = Regex("\\[(\\d+)]")
+        val httpCode = httpCodeRegex.find(authErrorMessage)?.groupValues?.get(1)?.toIntOrNull()
+        val cleanMessage = authErrorMessage.replace(httpCodeRegex, "").trim()
+
+        val (message, field) = when {
+            // HTTP 401 - 未授权（账号或密码错误）
+            httpCode == 401 -> "邮箱或密码错误" to LoginErrorField.BOTH
+            // HTTP 403 - 禁止访问（账户被禁用）
+            httpCode == 403 -> "账户已被禁用" to LoginErrorField.BOTH
+            // HTTP 4xx - 客户端错误
+            httpCode != null && httpCode in 400..499 ->
+                (cleanMessage.ifEmpty { "请求参数错误" }) to LoginErrorField.BOTH
+            // HTTP 5xx - 服务器错误
+            httpCode != null && httpCode in 500..599 ->
+                "服务器错误，请稍后重试" to null
+            // 网络连接错误
+            cleanMessage.contains("连接", ignoreCase = true) ||
+            cleanMessage.contains("网络", ignoreCase = true) ||
+            cleanMessage.contains("timeout", ignoreCase = true) ||
+            cleanMessage.contains("无法连接", ignoreCase = true) ->
+                "网络连接失败，请检查网络设置" to null
+            // 其他未知错误
+            else -> (cleanMessage.ifEmpty { "登录失败，请稍后重试" }) to null
+        }
+
+        setLoginError(message, field)
     }
 }
 

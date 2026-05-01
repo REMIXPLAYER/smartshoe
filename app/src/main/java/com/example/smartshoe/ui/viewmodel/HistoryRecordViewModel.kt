@@ -1,6 +1,5 @@
 package com.example.smartshoe.ui.viewmodel
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartshoe.domain.repository.HistoryRecordRepository
@@ -16,58 +15,48 @@ import javax.inject.Inject
 
 /**
  * 历史记录视图模型
- * 管理历史记录相关的 UI 状态（使用 StateFlow）
+ * 管理历史记录相关的 UI 状态
+ *
+ * 重构后：
+ * - 不再实现 Repository 回调接口
+ * - 直接观察 Repository 的 StateFlow
+ * - 所有操作通过挂起函数委托给 Repository
  */
 @HiltViewModel
 class HistoryRecordViewModel @Inject constructor(
-    val savedStateHandle: SavedStateHandle,
     private val repository: HistoryRecordRepository
-) : ViewModel(), HistoryRecordRepository.HistoryRecordCallback {
+) : ViewModel() {
 
-    companion object {
-        private const val KEY_CALLBACK_INITIALIZED = "callback_initialized"
-    }
+    // 直接暴露 Repository 的 StateFlow，避免重复定义
+    val historyRecords: StateFlow<List<SensorDataRecord>> = repository.recordsFlow
+    val isHistoryLoading: StateFlow<Boolean> = repository.isLoadingFlow
+    val hasMoreHistoryPages: StateFlow<Boolean> = repository.hasMoreFlow
+    val selectedRecordData: StateFlow<List<SensorDataPoint>> = repository.recordDetailFlow
+    val isRecordDetailLoading: StateFlow<Boolean> = repository.isDetailLoadingFlow
 
-    // UI 状态 - 使用 StateFlow 管理
-    private val _historyRecords = MutableStateFlow<List<SensorDataRecord>>(emptyList())
-    val historyRecords: StateFlow<List<SensorDataRecord>> = _historyRecords.asStateFlow()
-
+    // 本地 UI 状态
     private val _selectedHistoryRecord = MutableStateFlow<SensorDataRecord?>(null)
     val selectedHistoryRecord: StateFlow<SensorDataRecord?> = _selectedHistoryRecord.asStateFlow()
 
-    private val _selectedRecordData = MutableStateFlow<List<SensorDataPoint>>(emptyList())
-    val selectedRecordData: StateFlow<List<SensorDataPoint>> = _selectedRecordData.asStateFlow()
-
-    private val _isHistoryLoading = MutableStateFlow(false)
-    val isHistoryLoading: StateFlow<Boolean> = _isHistoryLoading.asStateFlow()
-
-    private val _isRecordDetailLoading = MutableStateFlow(false)
-    val isRecordDetailLoading: StateFlow<Boolean> = _isRecordDetailLoading.asStateFlow()
-
-    private val _queryExecuted = MutableStateFlow(false)
-    val queryExecuted: StateFlow<Boolean> = _queryExecuted.asStateFlow()
-
-    private val _hasMoreHistoryPages = MutableStateFlow(true)
-    val hasMoreHistoryPages: StateFlow<Boolean> = _hasMoreHistoryPages.asStateFlow()
-
-    // 日期范围 - 默认不筛选（null表示不限制日期）
     private val _historyStartDate = MutableStateFlow<Date?>(null)
     val historyStartDate: StateFlow<Date?> = _historyStartDate.asStateFlow()
 
     private val _historyEndDate = MutableStateFlow<Date?>(null)
     val historyEndDate: StateFlow<Date?> = _historyEndDate.asStateFlow()
 
-    // 错误回调（保留回调机制用于与 Repository 通信）
-    var onError: ((String) -> Unit)? = null
-    var onRecordsLoaded: (() -> Unit)? = null
-    var onRecordDetailLoaded: (() -> Unit)? = null
+    private val _queryExecuted = MutableStateFlow(false)
+    val queryExecuted: StateFlow<Boolean> = _queryExecuted.asStateFlow()
+
+    // 错误状态（从 Repository 错误流映射）
+    val errorMessage: StateFlow<String?> = repository.errorFlow
 
     init {
-        // 使用SavedStateHandle避免配置变更时重复设置回调
-        val isCallbackInitialized = savedStateHandle.get<Boolean>(KEY_CALLBACK_INITIALIZED) ?: false
-        if (!isCallbackInitialized) {
-            repository.setCallback(this)
-            savedStateHandle[KEY_CALLBACK_INITIALIZED] = true
+        // 收集 Repository 错误流，可在此添加额外处理（如日志、统计）
+        viewModelScope.launch {
+            repository.errorFlow.collect { error ->
+                // 错误已通过 errorMessage 暴露给 UI
+                // 可在此添加日志记录或埋点
+            }
         }
     }
 
@@ -77,34 +66,41 @@ class HistoryRecordViewModel @Inject constructor(
     fun queryHistoryRecords(page: Int = 0, append: Boolean = false) {
         _queryExecuted.value = true
         if (!append) {
-            _historyRecords.value = emptyList()
             _selectedHistoryRecord.value = null
-            _selectedRecordData.value = emptyList()
-            _hasMoreHistoryPages.value = true
         }
-        repository.queryHistoryRecords(page, append, _historyStartDate.value, _historyEndDate.value)
+        viewModelScope.launch {
+            repository.queryHistoryRecords(
+                page = page,
+                append = append,
+                startDate = _historyStartDate.value,
+                endDate = _historyEndDate.value
+            )
+        }
     }
 
     /**
      * 加载更多历史记录
      */
     fun loadMoreHistoryRecords() {
-        if (_isHistoryLoading.value || !_hasMoreHistoryPages.value) return
-        repository.loadMoreHistoryRecords(_historyStartDate.value, _historyEndDate.value)
+        if (isHistoryLoading.value || !hasMoreHistoryPages.value) return
+        viewModelScope.launch {
+            repository.loadMoreHistoryRecords(
+                startDate = _historyStartDate.value,
+                endDate = _historyEndDate.value
+            )
+        }
     }
 
     /**
      * 刷新历史记录
      */
     fun refreshHistoryRecords() {
-        repository.refreshHistoryRecords(_historyStartDate.value, _historyEndDate.value)
-    }
-
-    /**
-     * 加载记录详情
-     */
-    fun loadRecordDetail(recordId: String) {
-        repository.loadRecordDetail(recordId)
+        viewModelScope.launch {
+            repository.refreshHistoryRecords(
+                startDate = _historyStartDate.value,
+                endDate = _historyEndDate.value
+            )
+        }
     }
 
     /**
@@ -112,11 +108,7 @@ class HistoryRecordViewModel @Inject constructor(
      */
     fun selectRecord(record: SensorDataRecord?) {
         _selectedHistoryRecord.value = record
-        if (record != null) {
-            loadRecordDetail(record.recordId)
-        } else {
-            _selectedRecordData.value = emptyList()
-        }
+        repository.selectRecord(record)
     }
 
     /**
@@ -124,6 +116,7 @@ class HistoryRecordViewModel @Inject constructor(
      */
     fun updateStartDate(date: Date?) {
         _historyStartDate.value = date
+        repository.setDateRange(date, _historyEndDate.value)
     }
 
     /**
@@ -131,50 +124,27 @@ class HistoryRecordViewModel @Inject constructor(
      */
     fun updateEndDate(date: Date?) {
         _historyEndDate.value = date
+        repository.setDateRange(_historyStartDate.value, date)
     }
 
     /**
      * 重置日期范围
      */
     fun resetDateRange() {
-        _historyStartDate.value = repository.getDefaultStartDate()
-        _historyEndDate.value = repository.getDefaultEndDate()
+        val start = repository.getDefaultStartDate()
+        val end = repository.getDefaultEndDate()
+        _historyStartDate.value = start
+        _historyEndDate.value = end
+        repository.setDateRange(start, end)
     }
 
     /**
      * 清空所有历史记录数据
      */
     fun clearHistoryData() {
-        _historyRecords.value = emptyList()
         _selectedHistoryRecord.value = null
-        _selectedRecordData.value = emptyList()
-        _isHistoryLoading.value = false
-        _isRecordDetailLoading.value = false
         _queryExecuted.value = false
-        _hasMoreHistoryPages.value = true
+        repository.clearSelection()
         repository.clearCache()
-    }
-
-    // Callback implementations
-    override fun onRecordsLoaded(records: List<SensorDataRecord>, hasMore: Boolean) {
-        viewModelScope.launch {
-            // 避免重复添加
-            val existingIds = _historyRecords.value.map { it.recordId }.toSet()
-            val newRecords = records.filter { it.recordId !in existingIds }
-            _historyRecords.value = _historyRecords.value + newRecords
-            _hasMoreHistoryPages.value = hasMore
-            onRecordsLoaded?.invoke()
-        }
-    }
-
-    override fun onRecordDetailLoaded(recordId: String, dataPoints: List<SensorDataPoint>) {
-        viewModelScope.launch {
-            _selectedRecordData.value = dataPoints
-            onRecordDetailLoaded?.invoke()
-        }
-    }
-
-    override fun onError(message: String) {
-        onError?.invoke(message)
     }
 }

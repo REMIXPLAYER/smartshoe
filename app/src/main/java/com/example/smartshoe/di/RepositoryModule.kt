@@ -2,12 +2,14 @@ package com.example.smartshoe.di
 
 import com.example.smartshoe.data.repository.AuthRepositoryImpl
 import com.example.smartshoe.data.repository.AiAssistantRepositoryImpl
+import com.example.smartshoe.data.repository.AiConversationRepositoryImpl
 import com.example.smartshoe.data.repository.SensorDataRemoteRepositoryImpl
 import com.example.smartshoe.data.repository.SensorDataRepositoryImpl
 import com.example.smartshoe.data.repository.HistoryRecordRepositoryImpl
 import com.example.smartshoe.data.repository.UserProfileRepositoryImpl
 import com.example.smartshoe.domain.repository.AuthRepository
 import com.example.smartshoe.domain.repository.AiAssistantRepository
+import com.example.smartshoe.domain.repository.AiConversationRepository
 import com.example.smartshoe.domain.repository.SensorDataRemoteRepository
 import com.example.smartshoe.domain.repository.SensorDataRepository
 import com.example.smartshoe.domain.repository.HistoryRecordRepository
@@ -79,4 +81,13 @@ abstract class RepositoryModule {
     abstract fun bindUserProfileRepository(
         impl: UserProfileRepositoryImpl
     ): UserProfileRepository
+
+    /**
+     * 绑定AI对话仓库接口到实现类
+     */
+    @Binds
+    @Singleton
+    abstract fun bindAiConversationRepository(
+        impl: AiConversationRepositoryImpl
+    ): AiConversationRepository
 }

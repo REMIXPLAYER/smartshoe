@@ -48,14 +48,7 @@ object AppConfig {
         const val DEFAULT_MOCK_DATA_COUNT = 10000
         const val DEFAULT_MOCK_TIME_RANGE_MINUTES = 15
 
-        // 传感器3替代方案配置
-        // 当 SENSOR3_USE_CALCULATED_VALUE = true 时，传感器3的值 = 传感器2 * 9/7
-        // 硬件修复后，将此值设为 false 即可恢复原始数据
-        const val SENSOR3_USE_CALCULATED_VALUE = true
 
-        // 传感器3计算配置
-        const val SENSOR3_MULTIPLIER = 9
-        const val SENSOR3_DIVISOR = 7
 
         // 加权平均配置
         const val WEIGHTED_WINDOW_SIZE = 200         // 滑动窗口大小

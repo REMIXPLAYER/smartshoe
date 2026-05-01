@@ -60,7 +60,7 @@ fun StatsCard(
                 icon = com.example.smartshoe.R.drawable.bluetooth,
                 label = "设备状态",
                 value = if (isConnected) "已连接" else "未连接",
-                indicatorColor = if (isConnected) AppColors.Primary else AppColors.DarkGray,
+                indicatorColor = if (isConnected) AppColors.Primary else AppColors.PlaceholderText,
                 isActive = isConnected
             )
 
@@ -72,7 +72,7 @@ fun StatsCard(
                 icon = com.example.smartshoe.R.drawable.man,
                 label = "体重数据",
                 value = if (weight > 0) "${weight}kg" else "未设置",
-                indicatorColor = if (weight > 0) AppColors.Primary else AppColors.DarkGray,
+                indicatorColor = if (weight > 0) AppColors.Primary else AppColors.PlaceholderText,
                 isActive = weight > 0
             )
 
@@ -84,7 +84,7 @@ fun StatsCard(
                 UploadStatus.UPLOADING -> "上传中" to AppColors.Primary
                 UploadStatus.SUCCESS -> "已备份" to AppColors.Primary
                 UploadStatus.FAILED -> "失败" to AppColors.Error
-                else -> "未备份" to AppColors.DarkGray
+                else -> "未备份" to AppColors.PlaceholderText
             }
             StatItem(
                 icon = com.example.smartshoe.R.drawable.cloud,
@@ -126,7 +126,7 @@ fun StatItem(
             Icon(
                 painter = painterResource(icon),
                 contentDescription = label,
-                tint = if (isActive) indicatorColor else AppColors.DarkGray,
+                tint = if (isActive) indicatorColor else AppColors.PlaceholderText,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -135,7 +135,7 @@ fun StatItem(
             text = value,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
-            color = if (isActive) indicatorColor else AppColors.DarkGray
+            color = if (isActive) indicatorColor else AppColors.PlaceholderText
         )
     }
 }

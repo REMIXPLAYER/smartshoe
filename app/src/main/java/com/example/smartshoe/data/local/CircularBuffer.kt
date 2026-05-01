@@ -94,7 +94,8 @@ class CircularBuffer<T>(private val capacity: Int) {
     }
 
     /**
-     * 获取最新的N个元素
+     * 获取最新的N个元素（按从新到旧顺序）
+     * 优化：使用预计算索引 + addLast，避免 add(0, it) 的 O(n²) 问题
      */
     @Suppress("UNCHECKED_CAST")
     fun getLatest(n: Int): List<T> {
@@ -104,9 +105,11 @@ class CircularBuffer<T>(private val capacity: Int) {
 
             val result = ArrayList<T>(actualN)
 
-            for (i in 1..actualN) {
-                val index = (head - i + capacity) % capacity
-                buffer[index]?.let { result.add(0, it as T) }
+            // 从最新元素开始，按从新到旧顺序遍历
+            // 最新元素在 head - 1 位置
+            for (i in 0 until actualN) {
+                val index = (head - 1 - i + capacity) % capacity
+                buffer[index]?.let { result.add(it as T) }
             }
 
             return result

@@ -47,7 +47,7 @@ fun ReminderSettingsContent(
                 Text(
                     text = "检测到异常压力时通知",
                     fontSize = 12.sp,
-                    color = AppColors.DarkGray
+                    color = AppColors.PlaceholderText
                 )
             }
             Switch(

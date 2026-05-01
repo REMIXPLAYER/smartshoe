@@ -241,7 +241,7 @@ fun QuickActionButton(
         Text(
             text = label,
             fontSize = 13.sp,
-            color = if (isActive) AppColors.Primary else AppColors.DarkGray,
+            color = if (isActive) AppColors.Primary else AppColors.PlaceholderText,
             fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal
         )
     }

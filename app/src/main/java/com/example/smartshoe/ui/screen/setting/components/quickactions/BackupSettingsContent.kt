@@ -70,7 +70,7 @@ fun BackupSettingsContent(
                     color = when (uploadStatus) {
                         UploadStatus.SUCCESS -> AppColors.Primary
                         UploadStatus.FAILED -> AppColors.Error
-                        else -> AppColors.DarkGray
+                        else -> AppColors.PlaceholderText
                     }
                 )
             }
@@ -108,7 +108,7 @@ fun BackupSettingsContent(
                     ) {
                         Text(
                             "重试",
-                            color = if (isLoggedIn && hasData) AppColors.Error else AppColors.DarkGray,
+                            color = if (isLoggedIn && hasData) AppColors.Error else AppColors.PlaceholderText,
                             fontSize = 14.sp
                         )
                     }
@@ -118,7 +118,7 @@ fun BackupSettingsContent(
                     Icon(
                         painter = painterResource(R.drawable.upload),
                         contentDescription = "备份",
-                        tint = if (isLoggedIn && hasData) AppColors.Primary else AppColors.DarkGray.copy(alpha = 0.3f),
+                        tint = if (isLoggedIn && hasData) AppColors.Primary else AppColors.PlaceholderText.copy(alpha = 0.3f),
                         modifier = Modifier
                             .size(28.dp)
                             .clickable(

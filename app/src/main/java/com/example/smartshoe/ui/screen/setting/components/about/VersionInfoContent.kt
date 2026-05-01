@@ -60,7 +60,7 @@ fun VersionInfoContent() {
         Text(
             text = "© 2026 SmartShoe Team. All rights reserved.",
             fontSize = 11.sp,
-            color = AppColors.DarkGray.copy(alpha = 0.7f),
+            color = AppColors.PlaceholderText.copy(alpha = 0.7f),
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
     }
@@ -87,7 +87,7 @@ fun InfoRow(icon: Int, label: String, value: String) {
             Text(
                 text = label,
                 fontSize = 13.sp,
-                color = AppColors.DarkGray
+                color = AppColors.PlaceholderText
             )
         }
         Text(
@@ -120,7 +120,7 @@ fun InfoRow(iconVector: androidx.compose.ui.graphics.vector.ImageVector, label: 
             Text(
                 text = label,
                 fontSize = 13.sp,
-                color = AppColors.DarkGray
+                color = AppColors.PlaceholderText
             )
         }
         Text(

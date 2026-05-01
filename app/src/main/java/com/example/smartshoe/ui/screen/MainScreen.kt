@@ -5,7 +5,9 @@ import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -13,12 +15,14 @@ import androidx.compose.ui.unit.dp
 import com.example.smartshoe.domain.model.SensorDataPoint
 import com.example.smartshoe.domain.model.SensorDataRecord
 import com.example.smartshoe.ui.component.BottomNavigation.BottomNavigationBar
+import com.example.smartshoe.ui.component.ConversationDrawer
 import com.example.smartshoe.ui.component.sensor.SensorCanvas.InsoleWithSensors
-import com.example.smartshoe.ui.screen.DataRecordScreen.DataRecordScreen
+import com.example.smartshoe.ui.screen.DataRecordScreen
 import com.example.smartshoe.ui.screen.SettingScreen.SettingsScreen
 import com.example.smartshoe.ui.screen.main.MainScreenCallbacks
 import com.example.smartshoe.ui.screen.main.MainScreenState
 import com.example.smartshoe.ui.screen.main.SnackbarType
+import com.example.smartshoe.ui.screen.main.components.AppTopBar
 import com.example.smartshoe.ui.screen.main.components.CustomSnackbar
 import com.example.smartshoe.ui.screen.main.components.ExpandableDeviceListSection
 import com.example.smartshoe.ui.theme.AppColors
@@ -123,10 +127,35 @@ private fun MainAppScreen(
         derivedStateOf { state.pressureStatuses }
     }
 
+    // AI助手ViewModel和状态
+    val aiViewModel = callbacks.aiAssistantViewModel
+    val conversations = aiViewModel?.conversations?.collectAsStateWithLifecycle()?.value ?: emptyList()
+    val currentConversationId = aiViewModel?.currentConversationId?.collectAsStateWithLifecycle()?.value
+    val searchKeyword = aiViewModel?.searchKeyword?.collectAsStateWithLifecycle()?.value ?: ""
+    val showConversationDrawer = aiViewModel?.showConversationDrawer?.collectAsStateWithLifecycle()?.value ?: false
+
+    // TopBar按钮点击处理
+    val onMenuClick: () -> Unit = {
+        aiViewModel?.showConversationDrawer()
+    }
+    val onNewConversation: () -> Unit = {
+        if (conversations.isNotEmpty()) {
+            // 有对话记录时：跳转到AI助手页面并新增对话
+            callbacks.onTabSelected(3)
+            aiViewModel?.createNewConversation()
+        } else {
+            // 没有对话记录时：只跳转到AI助手页面，不新增对话
+            callbacks.onTabSelected(3)
+        }
+    }
+
     Scaffold(
         modifier = modifier,
         topBar = {
-            AppTopBar()
+            AppTopBar(
+                onMenuClick = onMenuClick,
+                onNewConversation = onNewConversation
+            )
         },
         bottomBar = {
             // 底部导航栏
@@ -165,7 +194,7 @@ private fun MainAppScreen(
                 }
 
                 2 -> { // 历史记录页面
-                    HistoryScreen.HistoryScreen(
+                    HistoryScreen(
                         modifier = Modifier.padding(innerPadding),
                         records = state.historyRecords,
                         selectedRecord = state.selectedHistoryRecord,
@@ -185,7 +214,7 @@ private fun MainAppScreen(
                 }
 
                 3 -> { // AI助手页面
-                    callbacks.aiAssistantViewModel?.let { viewModel ->
+                    aiViewModel?.let { viewModel ->
                         AiAssistantScreen(
                             modifier = Modifier.padding(innerPadding),
                             viewModel = viewModel,
@@ -225,27 +254,31 @@ private fun MainAppScreen(
             }
         }
     )
-}
 
-/**
- * 顶部应用栏组件
- * 显示应用标题和品牌颜色
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AppTopBar() {
-    TopAppBar(
-        title = {
-            Text(
-                "足底压力可视化",
-                fontSize = AppTypography.TitleTextSize
-            )
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = AppColors.TopAppBar,
-            titleContentColor = Color.White
+    // 对话列表抽屉 - 全局显示，所有页面都能滑出
+    aiViewModel?.let { viewModel ->
+        ConversationDrawer(
+            isOpen = showConversationDrawer,
+            conversations = conversations,
+            currentConversationId = currentConversationId,
+            searchKeyword = searchKeyword,
+            onSearchChange = { viewModel.searchConversations(it) },
+            onConversationClick = { conversationId ->
+                // 切换到AI助手页面并加载对话
+                callbacks.onTabSelected(3)
+                viewModel.switchToConversation(conversationId)
+            },
+            onNewConversation = {
+                // 跳转到AI助手页面并新增对话
+                callbacks.onTabSelected(3)
+                viewModel.createNewConversation()
+            },
+            onDeleteConversation = { conversationId ->
+                viewModel.deleteConversation(conversationId)
+            },
+            onClose = { viewModel.hideConversationDrawer() }
         )
-    )
+    }
 }
 
 /**

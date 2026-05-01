@@ -62,7 +62,7 @@ fun PrivacyPolicyContent() {
         Text(
             text = "如有疑问，请联系开发团队",
             fontSize = 11.sp,
-            color = AppColors.DarkGray.copy(alpha = 0.7f)
+            color = AppColors.PlaceholderText.copy(alpha = 0.7f)
         )
     }
 }
@@ -83,7 +83,7 @@ fun PrivacySection(title: String, content: String) {
         Text(
             text = content,
             fontSize = 12.sp,
-            color = AppColors.DarkGray,
+            color = AppColors.PlaceholderText,
             lineHeight = 18.sp
         )
     }

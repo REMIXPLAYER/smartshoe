@@ -86,7 +86,7 @@ object SensorCanvas {
                         val canvasSize = Size(size.width, size.height)
 
                         sensorPositions.forEachIndexed { index, position ->
-                            val color = sensorColors.getOrElse(index) { AppColors.DarkGray }
+                            val color = sensorColors.getOrElse(index) { AppColors.PlaceholderText }
                             val bounds = calculateSensorBounds(canvasSize, position)
                             drawSensor(color, bounds, position.shape)
                         }
@@ -135,7 +135,7 @@ object SensorCanvas {
                     Text(
                         "传感器 ${index + 1}",
                         fontSize = 14.sp,
-                        color = AppColors.DarkGray,
+                        color = AppColors.PlaceholderText,
                         fontWeight = FontWeight.Medium
                     )
 
@@ -145,7 +145,7 @@ object SensorCanvas {
                         value.toString(),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (value > 0) AppColors.Title else AppColors.DarkGray
+                        color = if (value > 0) AppColors.Title else AppColors.PlaceholderText
                     )
 
                     Spacer(modifier = Modifier.height(2.dp))
@@ -242,7 +242,7 @@ object SensorCanvas {
                 val canvasSize = Size(size.width, size.height)
 
                 sensorPositions.forEachIndexed { index, position ->
-                    val color = sensorColors.getOrElse(index) { AppColors.DarkGray }
+                    val color = sensorColors.getOrElse(index) { AppColors.PlaceholderText }
                     val bounds = calculateSensorBounds(canvasSize, position)
                     drawSensor(color, bounds, position.shape)
                 }

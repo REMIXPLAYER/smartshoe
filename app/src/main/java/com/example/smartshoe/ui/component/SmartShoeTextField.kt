@@ -162,7 +162,7 @@ object SmartShoeTextField {
                         Icon(
                             painter = if (passwordVisible) visibilityIcon else visibilityOffIcon,
                             contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
-                            tint = AppColors.DarkGray
+                            tint = AppColors.PlaceholderText
                         )
                     }
                 }

@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartshoe.config.AppConfig
+import com.example.smartshoe.data.manager.BluetoothConnectionManager
 import com.example.smartshoe.data.manager.UserPreferencesManager
 import com.example.smartshoe.domain.model.SensorDataPoint
 import com.example.smartshoe.domain.model.SensorDataRecord
@@ -13,8 +14,11 @@ import com.example.smartshoe.domain.repository.SensorDataRemoteRepository
 import com.example.smartshoe.domain.repository.SensorDataRepository
 import com.example.smartshoe.util.ColorUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -29,13 +33,16 @@ private val INITIAL_SENSOR_COLOR = ColorUtils.COLOR_ZERO
  * 重构：
  * 1. 添加 SensorDataRemoteRepository 依赖，封装数据上传功能
  * 2. 添加 UserPreferencesManager 依赖，管理用户偏好设置
- * 消除 MainActivity 直接访问 Manager 和 LocalDataSource 的问题
+ * 3. 添加 BluetoothConnectionManager 依赖，直接收集蓝牙原始数据流
+ * 4. 消除 MainActivity 直接访问 Manager 和 LocalDataSource 的问题
+ * 5. 消除 MainActivity 作为蓝牙数据中转站的职责
  */
 @HiltViewModel
 class SensorDataViewModel @Inject constructor(
     private val sensorDataRepository: SensorDataRepository,
     private val sensorDataRemoteRepository: SensorDataRemoteRepository,
-    private val userPreferencesManager: UserPreferencesManager
+    private val userPreferencesManager: UserPreferencesManager,
+    private val bluetoothConnectionManager: BluetoothConnectionManager
 ) : ViewModel() {
 
     // 传感器颜色状态 - 基于瞬时数值渐变渲染（使用深灰色作为初始状态）
@@ -66,15 +73,46 @@ class SensorDataViewModel @Inject constructor(
     private val _showAlertDialog = MutableStateFlow(false)
     val showAlertDialog: StateFlow<Boolean> = _showAlertDialog.asStateFlow()
 
-    // 数据接收回调（供Activity设置）
-    var onDataReceived: ((String) -> Unit)? = null
-
     private val _alertMessage = MutableStateFlow("")
     val alertMessage: StateFlow<String> = _alertMessage.asStateFlow()
 
     // 压力提醒启用状态
     private val _pressureAlertsEnabled = MutableStateFlow(true)
     val pressureAlertsEnabled: StateFlow<Boolean> = _pressureAlertsEnabled.asStateFlow()
+
+    // 蓝牙错误状态（从 BluetoothConnectionManager 转发）
+    private val _bluetoothError = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    val bluetoothError: SharedFlow<String> = _bluetoothError.asSharedFlow()
+
+    // 蓝牙连接结果（从 BluetoothConnectionManager 转发）
+    private val _bluetoothConnectionResult = MutableSharedFlow<Pair<Boolean, String?>>(extraBufferCapacity = 16)
+    val bluetoothConnectionResult: SharedFlow<Pair<Boolean, String?>> = _bluetoothConnectionResult.asSharedFlow()
+
+    init {
+        // 收集蓝牙原始数据流
+        // 注意：rawDataFlow 是 SharedFlow，即使无订阅者也会接收数据
+        // 当蓝牙未连接时，数据仍会被解析但 shouldRecord=false
+        viewModelScope.launch {
+            bluetoothConnectionManager.rawDataFlow.collect { data ->
+                val shouldRecord = bluetoothConnectionManager.connectedDevice.value != null
+                processReceivedData(data, shouldRecord)
+            }
+        }
+
+        // 收集蓝牙错误流并转发到 UI
+        viewModelScope.launch {
+            bluetoothConnectionManager.errorFlow.collect { error ->
+                _bluetoothError.emit(error)
+            }
+        }
+
+        // 收集蓝牙连接结果流并转发到 UI
+        viewModelScope.launch {
+            bluetoothConnectionManager.connectionResultFlow.collect { result ->
+                _bluetoothConnectionResult.emit(result)
+            }
+        }
+    }
 
     /**
      * 处理接收到的蓝牙数据
@@ -264,7 +302,7 @@ class SensorDataViewModel @Inject constructor(
     ) {
         Log.d("BackupDebug", "========== SensorDataViewModel.uploadDataToServer 被调用 ==========")
         Log.d("BackupDebug", "数据点数量: ${dataPoints.size}")
-        
+
         // 检查登录状态
         if (!sensorDataRemoteRepository.isLoggedIn()) {
             Log.w("BackupDebug", "未登录，无法上传")
