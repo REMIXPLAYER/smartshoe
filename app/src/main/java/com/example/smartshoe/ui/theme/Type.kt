@@ -27,6 +27,7 @@ object AppTypography {
 object AppDimensions {
     // 间距
     val DefaultPadding = 16.dp                   // 默认内边距
+    val MediumPadding = 12.dp                    // 中等内边距
     val SmallPadding = 8.dp                      // 小内边距
     val LargePadding = 24.dp                     // 大内边距
 
@@ -34,9 +35,21 @@ object AppDimensions {
     val ButtonWidth = 120.dp                     // 按钮宽度
     val ButtonHeight = 48.dp                     // 按钮高度
 
+    // 图标尺寸
+    val IconSizeStandard = 24.dp                 // 标准图标尺寸
+    val IconSizeSmall = 20.dp                    // 小型图标尺寸
+
     // 图表尺寸
     val ChartHeight = 200.dp                     // 图表高度
     val ChartItemHeight = 180.dp                 // 图表项高度
+
+    // 组件高度
+    val ComponentHeight = 60.dp                  // 卡片标题栏/列表项最小高度
+    val IndicatorSize = 16.dp                    // 选中指示器尺寸
+
+    // 边框和间距
+    val BorderWidth = 2.dp                       // 标准边框宽度
+    val ContentVerticalPadding = 10.dp           // Surface列表项垂直内边距
 
     // 卡片圆角
     val CardCornerRadius = 12.dp                 // 卡片圆角

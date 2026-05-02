@@ -132,6 +132,8 @@ class AiAssistantViewModel @Inject constructor(
         super.onCleared()
         currentSseJob?.cancel()
         currentSseJob = null
+        updateTimeJob?.cancel()
+        updateTimeJob = null
     }
 
     /**
@@ -528,6 +530,7 @@ class AiAssistantViewModel @Inject constructor(
                     conversationRepository.searchConversations(keyword).first()
                 }
                 _conversations.value = list
+                _groupedConversations.value = groupConversationsByTime(list)
             } catch (e: Exception) {
                 onError?.invoke("搜索对话失败: ${e.message}")
             }
@@ -621,6 +624,8 @@ class AiAssistantViewModel @Inject constructor(
      * 清空所有AI数据（消息+缓存）
      */
     fun clearAllAiData() {
+        updateTimeJob?.cancel()
+        updateTimeJob = null
         clearMessages()
         clearAnalysisCache()
         _historyRecords.value = emptyList()

@@ -21,10 +21,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.smartshoe.R
 import com.example.smartshoe.ui.component.ExpandableChevron
 import com.example.smartshoe.ui.theme.AppColors
+import com.example.smartshoe.ui.theme.AppDimensions
+import com.example.smartshoe.ui.theme.AppTypography
 
 /**
  * AI模式选择器 - 悬浮设计，展开时覆盖消息内容
@@ -44,28 +45,28 @@ fun AiModeSelectorTopBar(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(12.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = AppDimensions.CardElevation),
+        shape = RoundedCornerShape(AppDimensions.CardCornerRadius)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(
-                    min = 60.dp,
-                    max = if (isExpanded) 280.dp else 60.dp
+                    min = AppDimensions.ComponentHeight,
+                    max = if (isExpanded) 280.dp else AppDimensions.ComponentHeight
                 )
         ) {
             // 标题栏 - 统一60.dp高度，与蓝牙卡片保持一致
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp)
+                    .height(AppDimensions.ComponentHeight)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
                         onClick = onExpandToggle
                     )
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = AppDimensions.DefaultPadding),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // AI图标 - 使用 minds 图标
@@ -73,15 +74,15 @@ fun AiModeSelectorTopBar(
                     painter = painterResource(R.drawable.minds),
                     contentDescription = "AI模式",
                     tint = AppColors.Primary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(AppDimensions.IconSizeStandard)
                 )
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(AppDimensions.MediumPadding))
 
                 // 主标题 - 统一16.sp SemiBold Primary色
                 Text(
                     text = "AI 模式",
-                    fontSize = 16.sp,
+                    fontSize = AppTypography.BodyTextSize,
                     fontWeight = FontWeight.SemiBold,
                     color = AppColors.Primary,
                     modifier = Modifier.weight(1f)
@@ -90,7 +91,7 @@ fun AiModeSelectorTopBar(
                 // 右侧：当前模式标签 + 展开图标
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(AppDimensions.SmallPadding)
                 ) {
                     // 当前模式标签 - 使用方案B：蓝紫对比
                     val modeLabel = if (enableThinking) "深度思考" else "快速响应"
@@ -101,11 +102,11 @@ fun AiModeSelectorTopBar(
 
                     Surface(
                         color = modeColor.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(AppDimensions.CardCornerRadius)
                     ) {
                         Text(
                             text = modeLabel,
-                            fontSize = 12.sp,
+                            fontSize = AppTypography.SmallTextSize,
                             fontWeight = FontWeight.Medium,
                             color = modeColor,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -115,7 +116,7 @@ fun AiModeSelectorTopBar(
                     // 统一展开图标（使用ExpandableChevron）
                     ExpandableChevron(
                         isExpanded = isExpanded,
-                        size = 24.dp,
+                        size = AppDimensions.IconSizeStandard,
                         tint = AppColors.OnSurface.copy(alpha = 0.6f)
                     )
                 }
@@ -134,8 +135,8 @@ fun AiModeSelectorTopBar(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 16.dp)
+                        .padding(horizontal = AppDimensions.DefaultPadding)
+                        .padding(bottom = AppDimensions.DefaultPadding)
                 ) {
                     ModeOptionItem(
                         title = "快速响应",
@@ -144,7 +145,7 @@ fun AiModeSelectorTopBar(
                         onClick = { onModeSelected(false) }
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimensions.SmallPadding))
 
                     ModeOptionItem(
                         title = "深度思考",
@@ -178,24 +179,24 @@ fun ModeOptionItem(
                 indication = null,
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(AppDimensions.ButtonCornerRadius),
         color = if (isSelected) AppColors.Primary.copy(alpha = 0.1f) else Color.Transparent
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = AppDimensions.MediumPadding, vertical = AppDimensions.ContentVerticalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(16.dp)
+                    .size(AppDimensions.IndicatorSize)
                     .clip(CircleShape)
                     .background(
                         if (isSelected) AppColors.Primary else Color.Transparent
                     )
                     .border(
-                        width = 2.dp,
+                        width = AppDimensions.BorderWidth,
                         color = if (isSelected) AppColors.Primary else AppColors.OnSurface.copy(alpha = 0.3f),
                         shape = CircleShape
                     ),
@@ -204,25 +205,25 @@ fun ModeOptionItem(
                 if (isSelected) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(AppDimensions.SmallPadding)
                             .clip(CircleShape)
                             .background(AppColors.CardBackground)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(AppDimensions.MediumPadding))
 
             Column {
                 Text(
                     text = title,
-                    fontSize = 14.sp,
+                    fontSize = AppTypography.CaptionTextSize,
                     fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
                     color = if (isSelected) AppColors.Primary else AppColors.OnSurface
                 )
                 Text(
                     text = subtitle,
-                    fontSize = 12.sp,
+                    fontSize = AppTypography.SmallTextSize,
                     color = AppColors.OnSurface.copy(alpha = 0.6f)
                 )
             }

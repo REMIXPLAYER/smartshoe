@@ -402,24 +402,4 @@ private fun ConversationItem(
     }
 }
 
-/**
- * 按时间分类对话
- */
-private fun groupConversationsByTime(
-    conversations: List<AiConversation>
-): Map<String, List<AiConversation>> {
-    val now = System.currentTimeMillis()
-    val oneDay = 24 * 60 * 60 * 1000L
-    val sevenDays = 7 * oneDay
-    val thirtyDays = 30 * oneDay
 
-    return conversations.groupBy { conversation ->
-        val diff = now - conversation.updatedAt
-        when {
-            diff < oneDay -> "今天"
-            diff < sevenDays -> "前7天"
-            diff < thirtyDays -> "前30天"
-            else -> "更早"
-        }
-    }
-}

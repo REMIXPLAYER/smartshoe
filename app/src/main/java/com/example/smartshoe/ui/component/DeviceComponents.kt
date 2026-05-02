@@ -12,7 +12,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +29,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,9 +42,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.smartshoe.R
 import com.example.smartshoe.ui.theme.AppColors
+import com.example.smartshoe.ui.theme.AppDimensions
+import com.example.smartshoe.ui.theme.AppTypography
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -85,15 +84,15 @@ fun DeviceListHeader(
             painter = painterResource(R.drawable.bluetooth),
             contentDescription = "蓝牙设备",
             tint = AppColors.Primary,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(AppDimensions.IconSizeStandard)
         )
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(AppDimensions.MediumPadding))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 "蓝牙设备管理",
-                fontSize = 16.sp,
+                fontSize = AppTypography.BodyTextSize,
                 fontWeight = FontWeight.Medium,
                 color = AppColors.OnSurface,
                 maxLines = 1,
@@ -101,7 +100,7 @@ fun DeviceListHeader(
             )
             Text(
                 text = subtitleText,
-                fontSize = 14.sp,
+                fontSize = AppTypography.CaptionTextSize,
                 color = subtitleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -111,7 +110,7 @@ fun DeviceListHeader(
         ExpandableArrowIcon(
             isExpanded = isExpanded,
             tint = AppColors.PlaceholderText,
-            size = 20.dp,
+            size = AppDimensions.IconSizeSmall,
             useGraphicsLayer = false
         )
     }
@@ -124,11 +123,11 @@ fun DeviceListHeader(
  */
 @SuppressLint("MissingPermission")
 fun getDeviceDisplayName(device: BluetoothDevice): String {
-    return when {
-        !device.name.isNullOrBlank() -> device.name!!
-        !device.address.isNullOrBlank() -> formatMacAddress(device.address!!)
-        else -> "未知设备"
-    }
+    val name = device.name
+    if (!name.isNullOrBlank()) return name
+    val address = device.address
+    if (!address.isNullOrBlank()) return formatMacAddress(address)
+    return "未知设备"
 }
 
 /**
@@ -167,27 +166,34 @@ fun CompactDeviceListItem(
     var isClickEnabled by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
     
-    // 连接动画 - 脉冲效果
-    val infiniteTransition = rememberInfiniteTransition(label = "connecting_pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
+    // 连接动画 - 脉冲效果（仅在连接中时运行动画）
+    val pulseScale: Float
+    val pulseAlpha: Float
     
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_alpha"
-    )
+    if (isConnecting) {
+        val infiniteTransition = rememberInfiniteTransition(label = "connecting_pulse")
+        pulseScale = infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse_scale"
+        ).value
+        pulseAlpha = infiniteTransition.animateFloat(
+            initialValue = 0.6f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse_alpha"
+        ).value
+    } else {
+        pulseScale = 1f
+        pulseAlpha = 1f
+    }
 
     Surface(
         modifier = Modifier
@@ -211,7 +217,7 @@ fun CompactDeviceListItem(
                     }
                 }
             ),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(AppDimensions.ButtonCornerRadius),
         color = when {
             isConnected -> AppColors.Primary.copy(alpha = 0.1f)
             isConnecting -> AppColors.Primary.copy(alpha = 0.05f)
@@ -221,7 +227,7 @@ fun CompactDeviceListItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = AppDimensions.MediumPadding, vertical = AppDimensions.ContentVerticalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 左侧：连接状态指示器或图标
@@ -231,13 +237,13 @@ fun CompactDeviceListItem(
                     painter = painterResource(R.drawable.connect_device),
                     contentDescription = "已连接设备",
                     tint = AppColors.Primary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(AppDimensions.IconSizeStandard)
                 )
             } else {
                 // 旧样式：圆形指示器
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(AppDimensions.IndicatorSize)
                         .clip(CircleShape)
                         .background(
                             when {
@@ -247,7 +253,7 @@ fun CompactDeviceListItem(
                             }
                         )
                         .border(
-                            width = 2.dp,
+                            width = AppDimensions.BorderWidth,
                             color = when {
                                 isConnected -> AppColors.Primary
                                 isConnecting -> AppColors.Primary.copy(alpha = pulseAlpha)
@@ -267,9 +273,9 @@ fun CompactDeviceListItem(
                         isConnected -> {
                             Box(
                                 modifier = Modifier
-                                    .size(8.dp)
+                                    .size(AppDimensions.SmallPadding)
                                     .clip(CircleShape)
-                                    .background(Color.White)
+                                    .background(AppColors.CardBackground)
                             )
                         }
                         isConnecting -> {
@@ -277,14 +283,14 @@ fun CompactDeviceListItem(
                             CircularProgressIndicator(
                                 modifier = Modifier.size(10.dp),
                                 color = AppColors.Primary,
-                                strokeWidth = 2.dp
+                                strokeWidth = AppDimensions.BorderWidth
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(AppDimensions.MediumPadding))
 
             // 中间：设备信息（名称 + 地址）
             Column(
@@ -292,7 +298,7 @@ fun CompactDeviceListItem(
             ) {
                 Text(
                     text = displayName,
-                    fontSize = 14.sp,
+                    fontSize = AppTypography.CaptionTextSize,
                     fontWeight = when {
                         isConnected || isConnecting -> FontWeight.Medium
                         else -> FontWeight.Normal
@@ -307,7 +313,7 @@ fun CompactDeviceListItem(
                 )
                 Text(
                     text = if (isConnecting) "连接中..." else address,
-                    fontSize = 12.sp,
+                    fontSize = AppTypography.SmallTextSize,
                     color = when {
                         isConnecting -> AppColors.Primary.copy(alpha = 0.8f)
                         else -> AppColors.OnSurface.copy(alpha = 0.6f)
@@ -327,7 +333,7 @@ fun CompactDeviceListItem(
                             painter = painterResource(R.drawable.disconnect_device),
                             contentDescription = "断开连接",
                             tint = AppColors.Error,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(AppDimensions.IconSizeStandard)
                         )
                     }
                 }
@@ -337,7 +343,7 @@ fun CompactDeviceListItem(
                         painter = painterResource(R.drawable.bluetooth),
                         contentDescription = "已连接",
                         tint = AppColors.Success,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(AppDimensions.IconSizeSmall)
                     )
                 }
                 isConnecting -> {
