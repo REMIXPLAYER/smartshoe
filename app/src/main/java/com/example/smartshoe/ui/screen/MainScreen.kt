@@ -130,6 +130,7 @@ private fun MainAppScreen(
     // AI助手ViewModel和状态
     val aiViewModel = callbacks.aiAssistantViewModel
     val conversations = aiViewModel?.conversations?.collectAsStateWithLifecycle()?.value ?: emptyList()
+    val groupedConversations = aiViewModel?.groupedConversations?.collectAsStateWithLifecycle()?.value ?: emptyMap()
     val currentConversationId = aiViewModel?.currentConversationId?.collectAsStateWithLifecycle()?.value
     val searchKeyword = aiViewModel?.searchKeyword?.collectAsStateWithLifecycle()?.value ?: ""
     val showConversationDrawer = aiViewModel?.showConversationDrawer?.collectAsStateWithLifecycle()?.value ?: false
@@ -259,7 +260,7 @@ private fun MainAppScreen(
     aiViewModel?.let { viewModel ->
         ConversationDrawer(
             isOpen = showConversationDrawer,
-            conversations = conversations,
+            groupedConversations = groupedConversations,
             currentConversationId = currentConversationId,
             searchKeyword = searchKeyword,
             onSearchChange = { viewModel.searchConversations(it) },

@@ -16,6 +16,7 @@ import com.example.smartshoe.domain.repository.HistoryRecordRepository
 import com.example.smartshoe.domain.usecase.GenerateConversationTitleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -102,6 +103,10 @@ class AiAssistantViewModel @Inject constructor(
     private val _conversations = MutableStateFlow<List<AiConversation>>(emptyList())
     val conversations: StateFlow<List<AiConversation>> = _conversations.asStateFlow()
 
+    // 预计算的分组对话列表（按时间分类），避免UI层重复计算
+    private val _groupedConversations = MutableStateFlow<Map<String, List<AiConversation>>>(emptyMap())
+    val groupedConversations: StateFlow<Map<String, List<AiConversation>>> = _groupedConversations.asStateFlow()
+
     // 对话列表加载状态
     private val _isLoadingConversations = MutableStateFlow(false)
     val isLoadingConversations: StateFlow<Boolean> = _isLoadingConversations.asStateFlow()
@@ -109,6 +114,9 @@ class AiAssistantViewModel @Inject constructor(
     // 搜索关键词
     private val _searchKeyword = MutableStateFlow("")
     val searchKeyword: StateFlow<String> = _searchKeyword.asStateFlow()
+
+    // 延迟更新updatedAt的Job，避免每条消息都触发数据库更新
+    private var updateTimeJob: Job? = null
 
     // 是否显示对话抽屉
     private val _showConversationDrawer = MutableStateFlow(false)
@@ -392,11 +400,31 @@ class AiAssistantViewModel @Inject constructor(
     /**
      * 加载所有对话列表
      * 在init中调用一次，建立Flow监听
+     * 同时预计算分组结果，避免UI层重复计算
      */
     private fun loadConversations() {
         viewModelScope.launch {
             conversationRepository.getAllConversations().collect { list ->
                 _conversations.value = list
+                _groupedConversations.value = groupConversationsByTime(list)
+            }
+        }
+    }
+
+    /**
+     * 按时间分组对话列表
+     * 在ViewModel中预计算，避免UI层重复执行
+     */
+    private fun groupConversationsByTime(conversations: List<AiConversation>): Map<String, List<AiConversation>> {
+        val now = System.currentTimeMillis()
+        val oneDay = 24 * 60 * 60 * 1000L
+        return conversations.groupBy { conversation ->
+            val diff = now - conversation.updatedAt
+            when {
+                diff < oneDay -> "今天"
+                diff < 7 * oneDay -> "前7天"
+                diff < 30 * oneDay -> "前30天"
+                else -> "更早"
             }
         }
     }
@@ -635,14 +663,30 @@ class AiAssistantViewModel @Inject constructor(
             if (message !is ChatMessage.StreamingAi) {
                 _currentConversationId.value?.let { conversationId ->
                     conversationRepository.saveMessage(conversationId, message)
-                    conversationRepository.updateConversationTime(conversationId)
                 }
             }
         }
-        
+
+        // 延迟更新对话时间，避免每条消息都触发数据库更新和Flow重算
+        _currentConversationId.value?.let { conversationId ->
+            scheduleConversationTimeUpdate(conversationId)
+        }
+
         // 在锁外异步更新标题，实现懒加载，不阻塞消息发送流程
         if (shouldUpdateTitle) {
             updateConversationTitleFromMessage(message.content)
+        }
+    }
+
+    /**
+     * 延迟更新对话时间，合并多次更新为一次
+     * 避免频繁的数据库写入和Flow重算
+     */
+    private fun scheduleConversationTimeUpdate(conversationId: String) {
+        updateTimeJob?.cancel()
+        updateTimeJob = viewModelScope.launch {
+            delay(2000) // 延迟2秒，合并短时间内的多次更新
+            conversationRepository.updateConversationTime(conversationId)
         }
     }
 

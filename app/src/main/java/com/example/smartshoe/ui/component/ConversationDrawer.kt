@@ -31,7 +31,6 @@ import com.example.smartshoe.domain.model.AiConversation
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppDimensions
 import com.example.smartshoe.util.DateTimeUtils
-import java.util.*
 
 /**
  * 对话列表抽屉
@@ -40,7 +39,7 @@ import java.util.*
 @Composable
 fun ConversationDrawer(
     isOpen: Boolean,
-    conversations: List<AiConversation>,
+    groupedConversations: Map<String, List<AiConversation>>,
     currentConversationId: String?,
     searchKeyword: String,
     onSearchChange: (String) -> Unit,
@@ -146,7 +145,7 @@ fun ConversationDrawer(
 
                 // 对话列表
                 ConversationList(
-                    conversations = conversations,
+                    groupedConversations = groupedConversations,
                     currentConversationId = currentConversationId,
                     onConversationClick = { id ->
                         onConversationClick(id)
@@ -230,47 +229,65 @@ private fun SearchBar(
 }
 
 /**
+ * 对话列表项类型（展平后的列表元素）
+ */
+private sealed class ConversationListItem {
+    data class Header(val category: String) : ConversationListItem()
+    data class Item(val conversation: AiConversation) : ConversationListItem()
+}
+
+/**
  * 对话列表（带时间分类）
+ * 使用展平列表避免LazyColumn嵌套forEach导致的布局重算
  */
 @Composable
 private fun ConversationList(
-    conversations: List<AiConversation>,
+    groupedConversations: Map<String, List<AiConversation>>,
     currentConversationId: String?,
     onConversationClick: (String) -> Unit,
     onDeleteConversation: (String) -> Unit
 ) {
-    // 按时间分类
-    val groupedConversations = remember(conversations) {
-        groupConversationsByTime(conversations)
+    // 展平为稳定列表，避免Map的equals比较不稳定问题
+    val listItems: List<ConversationListItem> = remember(groupedConversations) {
+        buildList {
+            groupedConversations.forEach { (category, items) ->
+                add(ConversationListItem.Header(category))
+                items.forEach { add(ConversationListItem.Item(it)) }
+            }
+        }
     }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        groupedConversations.forEach { (category, items) ->
-            // 分类标题
-            item(key = "header_$category") {
-                Text(
-                    text = category,
-                    fontSize = 12.sp,
-                    color = AppColors.PlaceholderText,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+        items(
+            items = listItems,
+            key = { item ->
+                when (item) {
+                    is ConversationListItem.Header -> "header_${item.category}"
+                    is ConversationListItem.Item -> item.conversation.id
+                }
             }
-
-            // 对话项
-            items(
-                items = items,
-                key = { it.id }
-            ) { conversation ->
-                ConversationItem(
-                    conversation = conversation,
-                    isSelected = conversation.id == currentConversationId,
-                    onClick = { onConversationClick(conversation.id) },
-                    onDelete = { onDeleteConversation(conversation.id) }
-                )
+        ) { item ->
+            when (item) {
+                is ConversationListItem.Header -> {
+                    Text(
+                        text = item.category,
+                        fontSize = 12.sp,
+                        color = AppColors.PlaceholderText,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+                is ConversationListItem.Item -> {
+                    ConversationItem(
+                        conversation = item.conversation,
+                        isSelected = item.conversation.id == currentConversationId,
+                        onClick = { onConversationClick(item.conversation.id) },
+                        onDelete = { onDeleteConversation(item.conversation.id) }
+                    )
+                }
             }
         }
     }
@@ -327,8 +344,11 @@ private fun ConversationItem(
                     color = if (isSelected) AppColors.Primary else AppColors.Title,
                     maxLines = 1
                 )
+                val formattedTime = remember(conversation.updatedAt) {
+                    DateTimeUtils.formatMonthDayHourMinute(conversation.updatedAt)
+                }
                 Text(
-                    text = DateTimeUtils.formatMonthDayHourMinute(conversation.updatedAt),
+                    text = formattedTime,
                     fontSize = 11.sp,
                     color = AppColors.PlaceholderText
                 )
