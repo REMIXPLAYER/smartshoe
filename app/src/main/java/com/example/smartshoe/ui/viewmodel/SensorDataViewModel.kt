@@ -20,7 +20,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 // 导入深灰色常量，用于初始状态
@@ -119,10 +121,18 @@ class SensorDataViewModel @Inject constructor(
      * 包含压力提醒检查，业务逻辑在 ViewModel 中处理
      * 颜色渲染：基于瞬时数值（extras）使用渐变方式
      * 压力提醒：基于加权平均值
+     *
+     * 优化：使用 suspend + withContext 切换调度器，避免阻塞主线程
+     * 注意：此方法应在 collect 协程中顺序调用，不创建新协程，保证数据顺序
+     * 蓝牙数据频率较高（10-50Hz），计算密集型操作在 Dispatchers.Default 执行
      */
-    fun processReceivedData(data: String, shouldRecord: Boolean = true) {
-        val result = sensorDataRepository.processReceivedData(data, shouldRecord)
+    suspend fun processReceivedData(data: String, shouldRecord: Boolean = true) {
+        // 切换到 Default 调度器执行计算密集型操作
+        val result = withContext(Dispatchers.Default) {
+            sensorDataRepository.processReceivedData(data, shouldRecord)
+        }
         result?.let { (values, extras) ->
+            // withContext 会自动恢复原来的调度器（Main）
             // 更新原始数值
             updateExtraValues(extras)
             refreshHistoricalData()

@@ -79,8 +79,9 @@ class BluetoothConnectionManager @Inject constructor(
     private val _rawDataFlow = MutableSharedFlow<String>(extraBufferCapacity = 64)
     val rawDataFlow: SharedFlow<String> = _rawDataFlow.asSharedFlow()
 
-    // 蓝牙数据通道 - 用于协程间数据传递（内部使用，不直接暴露）
-    private val dataChannel = Channel<String>(Channel.CONFLATED)
+    // 蓝牙数据通道 - 用于协程间数据传递（每次连接时创建，支持多设备）
+    // 注意：当前业务场景为单设备连接，但为 future-proof 设计为每次连接创建新 Channel
+    private var dataChannel: Channel<String>? = null
 
     // 最后收到数据的时间戳（用于连接保活）
     // 使用 @Volatile 确保多线程可见性（readJob 写，keepaliveJob 读）
@@ -261,8 +262,13 @@ class BluetoothConnectionManager @Inject constructor(
     /**
      * 开始监听蓝牙数据
      * 优化：使用 CONFLATED Channel 避免背压阻塞，增加连接保活
+     * 每次连接创建新的 Channel，支持多设备场景
      */
     private fun startDataListening(deviceAddress: String, socket: BluetoothSocket) {
+        // 为当前连接创建新的 Channel
+        val channel = Channel<String>(Channel.CONFLATED)
+        dataChannel = channel
+
         // 启动数据读取协程
         val readJob = connectionScope.launch {
             try {
@@ -281,7 +287,7 @@ class BluetoothConnectionManager @Inject constructor(
 
                             val data = String(buffer, 0, bytes)
                             // 使用 trySend 避免 Channel 满时阻塞读取协程
-                            val result = dataChannel.trySend(data)
+                            val result = channel.trySend(data)
                             if (!result.isSuccess) {
                                 Log.w(TAG, "Data channel full, dropping data")
                             }
@@ -305,13 +311,14 @@ class BluetoothConnectionManager @Inject constructor(
                 emitError("数据监听错误: ${e.message}")
             } finally {
                 Log.d(TAG, "Data listening ended for device: $deviceAddress")
+                channel.close() // 关闭 Channel，通知 dispatchJob 结束
             }
         }
 
         // 启动数据分发协程 - 通过 Channel 消费数据，转发到 SharedFlow
         val dispatchJob = connectionScope.launch {
             try {
-                for (data in dataChannel) {
+                for (data in channel) {
                     if (!isActive) break
                     _rawDataFlow.emit(data)
                 }

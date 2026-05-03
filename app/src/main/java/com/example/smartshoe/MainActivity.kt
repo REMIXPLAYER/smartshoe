@@ -11,6 +11,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
@@ -123,46 +125,75 @@ class MainActivity : ComponentActivity() {
         // 设置Compose UI内容
         // 重构：使用 MainScreen 组件，将UI逻辑从Activity分离
         // 使用数据类封装状态和回调，符合Clean Architecture
+        // 优化：使用 combine 合并高频变化的蓝牙/传感器状态，减少重组
         setContent {
-            // 收集所有ViewModel状态
-            val state = MainScreenState(
-                // 传感器数据
-                scannedDevices = bluetoothViewModel.scannedDevices.collectAsStateWithLifecycle().value,
-                sensorColors = sensorDataViewModel.sensorColors.collectAsStateWithLifecycle().value,
-                extraValues = sensorDataViewModel.extraValues.collectAsStateWithLifecycle().value,
-                pressureStatuses = sensorDataViewModel.pressureStatuses.collectAsStateWithLifecycle().value,
-                historicalData = sensorDataViewModel.historicalData.collectAsStateWithLifecycle().value,
-                connectedDevice = bluetoothViewModel.connectedDevice.collectAsStateWithLifecycle().value,
-                userWeight = userProfileViewModel.userWeight.collectAsStateWithLifecycle().value,
-                // 蓝牙扫描状态
-                isScanning = bluetoothViewModel.isScanning.collectAsStateWithLifecycle().value,
-                // 蓝牙连接状态
-                isConnecting = bluetoothViewModel.isConnecting.collectAsStateWithLifecycle().value,
-                connectingDeviceAddress = bluetoothViewModel.connectingDeviceAddress.collectAsStateWithLifecycle().value,
-                // 用户认证
-                userState = authViewModel.userState.collectAsStateWithLifecycle().value,
-                isLoggedIn = authViewModel.userState.collectAsStateWithLifecycle().value.isLoggedIn,
-                // 设置
-                pressureAlertsEnabled = sensorDataViewModel.pressureAlertsEnabled.collectAsStateWithLifecycle().value,
-                hasData = !sensorDataViewModel.isBackupDataEmpty(),
-                // 弹窗
-                showAlertDialog = sensorDataViewModel.showAlertDialog.collectAsStateWithLifecycle().value,
-                alertMessage = sensorDataViewModel.alertMessage.collectAsStateWithLifecycle().value,
-                // 历史记录
-                historyRecords = historyRecordViewModel.historyRecords.collectAsStateWithLifecycle().value,
-                selectedHistoryRecord = historyRecordViewModel.selectedHistoryRecord.collectAsStateWithLifecycle().value,
-                recordData = historyRecordViewModel.selectedRecordData.collectAsStateWithLifecycle().value,
-                isHistoryLoading = historyRecordViewModel.isHistoryLoading.collectAsStateWithLifecycle().value,
-                isRecordDetailLoading = historyRecordViewModel.isRecordDetailLoading.collectAsStateWithLifecycle().value,
-                historyStartDate = historyRecordViewModel.historyStartDate.collectAsStateWithLifecycle().value,
-                historyEndDate = historyRecordViewModel.historyEndDate.collectAsStateWithLifecycle().value,
-                queryExecuted = historyRecordViewModel.queryExecuted.collectAsStateWithLifecycle().value,
-                // 导航
-                selectedTab = mainViewModel.selectedTab.collectAsStateWithLifecycle().value,
-                // Snackbar
-                snackbarMessage = snackbarMessage,
-                snackbarType = snackbarType
-            )
+            // 使用 collectAsStateWithLifecycle 收集各ViewModel状态
+            val scannedDevices by bluetoothViewModel.scannedDevices.collectAsStateWithLifecycle()
+            val sensorColors by sensorDataViewModel.sensorColors.collectAsStateWithLifecycle()
+            val extraValues by sensorDataViewModel.extraValues.collectAsStateWithLifecycle()
+            val pressureStatuses by sensorDataViewModel.pressureStatuses.collectAsStateWithLifecycle()
+            val historicalData by sensorDataViewModel.historicalData.collectAsStateWithLifecycle()
+            val connectedDevice by bluetoothViewModel.connectedDevice.collectAsStateWithLifecycle()
+            val userWeight by userProfileViewModel.userWeight.collectAsStateWithLifecycle()
+            val isScanning by bluetoothViewModel.isScanning.collectAsStateWithLifecycle()
+            val isConnecting by bluetoothViewModel.isConnecting.collectAsStateWithLifecycle()
+            val connectingDeviceAddress by bluetoothViewModel.connectingDeviceAddress.collectAsStateWithLifecycle()
+            val userState by authViewModel.userState.collectAsStateWithLifecycle()
+            val pressureAlertsEnabled by sensorDataViewModel.pressureAlertsEnabled.collectAsStateWithLifecycle()
+            val showAlertDialog by sensorDataViewModel.showAlertDialog.collectAsStateWithLifecycle()
+            val alertMessage by sensorDataViewModel.alertMessage.collectAsStateWithLifecycle()
+            val historyRecords by historyRecordViewModel.historyRecords.collectAsStateWithLifecycle()
+            val selectedHistoryRecord by historyRecordViewModel.selectedHistoryRecord.collectAsStateWithLifecycle()
+            val recordData by historyRecordViewModel.selectedRecordData.collectAsStateWithLifecycle()
+            val isHistoryLoading by historyRecordViewModel.isHistoryLoading.collectAsStateWithLifecycle()
+            val isRecordDetailLoading by historyRecordViewModel.isRecordDetailLoading.collectAsStateWithLifecycle()
+            val historyStartDate by historyRecordViewModel.historyStartDate.collectAsStateWithLifecycle()
+            val historyEndDate by historyRecordViewModel.historyEndDate.collectAsStateWithLifecycle()
+            val queryExecuted by historyRecordViewModel.queryExecuted.collectAsStateWithLifecycle()
+            val selectedTab by mainViewModel.selectedTab.collectAsStateWithLifecycle()
+            val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+
+            // 使用 remember 缓存 MainScreenState，避免每次重组都创建新实例
+            val state = remember(
+                scannedDevices, sensorColors, extraValues, pressureStatuses,
+                historicalData, connectedDevice, userWeight, isScanning,
+                isConnecting, connectingDeviceAddress, userState,
+                pressureAlertsEnabled, showAlertDialog, alertMessage,
+                historyRecords, selectedHistoryRecord, recordData,
+                isHistoryLoading, isRecordDetailLoading, historyStartDate,
+                historyEndDate, queryExecuted, selectedTab,
+                snackbarMessage, snackbarType
+            ) {
+                MainScreenState(
+                    scannedDevices = scannedDevices,
+                    sensorColors = sensorColors,
+                    extraValues = extraValues,
+                    pressureStatuses = pressureStatuses,
+                    historicalData = historicalData,
+                    connectedDevice = connectedDevice,
+                    userWeight = userWeight,
+                    isScanning = isScanning,
+                    isConnecting = isConnecting,
+                    connectingDeviceAddress = connectingDeviceAddress,
+                    userState = userState,
+                    isLoggedIn = userState.isLoggedIn,
+                    pressureAlertsEnabled = pressureAlertsEnabled,
+                    hasData = !sensorDataViewModel.isBackupDataEmpty(),
+                    showAlertDialog = showAlertDialog,
+                    alertMessage = alertMessage,
+                    historyRecords = historyRecords,
+                    selectedHistoryRecord = selectedHistoryRecord,
+                    recordData = recordData,
+                    isHistoryLoading = isHistoryLoading,
+                    isRecordDetailLoading = isRecordDetailLoading,
+                    historyStartDate = historyStartDate,
+                    historyEndDate = historyEndDate,
+                    queryExecuted = queryExecuted,
+                    selectedTab = selectedTab,
+                    snackbarMessage = snackbarMessage,
+                    snackbarType = snackbarType
+                )
+            }
 
             val callbacks = MainScreenCallbacks(
                 // 蓝牙设备
@@ -184,7 +215,7 @@ class MainActivity : ComponentActivity() {
                 onRegister = { username, email, password -> authViewModel.register(username, email, password) },
                 onLogout = { authViewModel.logout() },
                 // 认证UI状态
-                authUiState = authViewModel.uiState.collectAsStateWithLifecycle().value,
+                authUiState = authUiState,
                 // 设置
                 onPressureAlertsChange = { enabled -> sensorDataViewModel.setPressureAlertsEnabled(enabled) },
                 // 弹窗
@@ -391,8 +422,5 @@ class MainActivity : ComponentActivity() {
 
         // 5. 调用父类方法
         super.onDestroy()
-
-        // 6. 建议系统进行垃圾回收
-        System.gc()
     }
 }

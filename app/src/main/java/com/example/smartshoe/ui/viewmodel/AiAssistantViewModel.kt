@@ -17,6 +17,7 @@ import com.example.smartshoe.domain.usecase.GenerateConversationTitleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import java.lang.ref.WeakReference
 import java.util.Collections
 import javax.inject.Inject
@@ -184,133 +186,55 @@ class AiAssistantViewModel @Inject constructor(
             val streamingMessage = ChatMessage.StreamingAi("", AppConfig.AiAssistant.DEFAULT_MODEL)
             addMessage(streamingMessage)
 
-            var fullResponse = ""
-            var modelName = AppConfig.AiAssistant.DEFAULT_MODEL
-            
-            // 节流控制变量
-            var pendingContent = ""  // 待更新的内容缓冲区
-            var lastUpdateTime = System.currentTimeMillis()  // 上次更新时间，初始化为当前时间避免首次立即更新
-            var charsSinceUpdate = 0 // 自上次更新以来的字符数
-
-            // 使用 Repository 进行流式传输
-            aiAssistantRepository.sendMessageStream(
+            // 使用提取的通用流式处理方法
+            val stream = aiAssistantRepository.sendMessageStream(
                 message = message,
                 token = token,
                 enableThinking = _enableThinking.value,
                 onStateChange = { state ->
                     _connectionState.value = state
                 }
-            ).collect { event ->
-                when (event) {
-                    is SseEvent.Data -> {
-                        // 累积响应内容
-                        fullResponse += event.content
-                        pendingContent += event.content
-                        charsSinceUpdate += event.content.length
-                        
-                        val currentTime = System.currentTimeMillis()
-                        val timeSinceLastUpdate = currentTime - lastUpdateTime
-                        
-                        // 检查是否需要立即更新
-                            val shouldUpdateImmediately = event.content.any { it in AppConfig.AiAssistant.STREAM_IMMEDIATE_UPDATE_CHARS } ||
-                                    charsSinceUpdate >= AppConfig.AiAssistant.STREAM_MAX_CHARS_BEFORE_UPDATE ||
-                                    timeSinceLastUpdate >= AppConfig.AiAssistant.STREAM_MIN_UPDATE_INTERVAL_MS
-                        
-                        if (shouldUpdateImmediately) {
-                            val currentMessages = _messages.value
-                            val lastMsg = currentMessages.lastOrNull()
-                            val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
-                                lastMsg.timestamp
-                            } else {
-                                System.currentTimeMillis()
-                            }
-                            updateLastMessage(ChatMessage.StreamingAi(
-                                content = fullResponse,
-                                model = modelName,
-                                timestamp = timestamp
-                            ))
-                            
-                            // 重置节流变量
-                            pendingContent = ""
-                            lastUpdateTime = currentTime
-                            charsSinceUpdate = 0
-                        }
-                    }
-                    is SseEvent.Complete -> {
-                        modelName = event.model
-                        val generationTimeMs = event.duration / AppConfig.AiAssistant.NANOSECONDS_TO_MILLISECONDS
-                        
-                        // 确保所有待更新内容都刷新到UI
-                        if (pendingContent.isNotEmpty()) {
-                            val currentMessages = _messages.value
-                            val lastMsg = currentMessages.lastOrNull()
-                            val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
-                                lastMsg.timestamp
-                            } else {
-                                System.currentTimeMillis()
-                            }
-                            updateLastMessage(ChatMessage.StreamingAi(
-                                content = fullResponse,
-                                model = modelName,
-                                timestamp = timestamp
-                            ))
-                        }
-                        
-                        // 直接将流式消息转换为普通AI消息，避免两次更新
+            )
+
+            processSseStream(
+                stream = stream,
+                onComplete = { fullResponse, modelName, generationTimeMs ->
+                    replaceLastMessage(ChatMessage.Ai(
+                        content = fullResponse,
+                        model = modelName,
+                        generationTimeMs = generationTimeMs
+                    ))
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        lastGenerationTimeMs = generationTimeMs
+                    )
+                    _connectionState.value = SseConnectionState.Idle
+                    currentSseJob = null
+                },
+                onError = { fullResponse, modelName, errorMessage ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = errorMessage
+                    )
+                    onError?.invoke(errorMessage)
+
+                    if (fullResponse.isNotEmpty()) {
                         replaceLastMessage(ChatMessage.Ai(
-                            content = fullResponse,
+                            content = fullResponse + "\n\n[生成中断: $errorMessage]",
                             model = modelName,
-                            generationTimeMs = generationTimeMs
+                            generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
                         ))
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            lastGenerationTimeMs = generationTimeMs
-                        )
-                        _connectionState.value = SseConnectionState.Idle
-                        currentSseJob = null  // 重置任务引用
+                    } else {
+                        replaceLastMessage(ChatMessage.Ai(
+                            content = "[生成失败: $errorMessage]",
+                            model = AppConfig.AiAssistant.ERROR_MODEL,
+                            generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
+                        ))
                     }
-                    is SseEvent.Error -> {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            error = event.message
-                        )
-                        onError?.invoke(event.message)
-                        
-                        // 确保所有待更新内容都刷新到UI
-                        if (pendingContent.isNotEmpty()) {
-                            val currentMessages = _messages.value
-                            val lastMsg = currentMessages.lastOrNull()
-                            val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
-                                lastMsg.timestamp
-                            } else {
-                                System.currentTimeMillis()
-                            }
-                            updateLastMessage(ChatMessage.StreamingAi(
-                                content = fullResponse,
-                                model = modelName,
-                                timestamp = timestamp
-                            ))
-                        }
-                        
-                        // 将流式消息转换为错误消息，而不是移除
-                        if (fullResponse.isNotEmpty()) {
-                            replaceLastMessage(ChatMessage.Ai(
-                                content = fullResponse + "\n\n[生成中断: ${event.message}]",
-                                model = modelName,
-                                generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
-                            ))
-                        } else {
-                            replaceLastMessage(ChatMessage.Ai(
-                                content = "[生成失败: ${event.message}]",
-                                model = AppConfig.AiAssistant.ERROR_MODEL,
-                                generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
-                            ))
-                        }
-                        _connectionState.value = SseConnectionState.Error(event.message)
-                        currentSseJob = null  // 重置任务引用
-                    }
+                    _connectionState.value = SseConnectionState.Error(errorMessage)
+                    currentSseJob = null
                 }
-            }
+            )
         }
     }
 
@@ -352,6 +276,111 @@ class AiAssistantViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * 通用 SSE 流式处理逻辑
+     * 提取 sendMessage 和 analyzeRecord 中的公共流式处理代码
+     *
+     * @param stream SSE 事件流
+     * @param onComplete 完成回调，返回 (fullResponse, modelName, generationTimeMs)
+     * @param onError 错误回调，返回 (fullResponse, modelName, errorMessage)
+     * @return 是否成功完成（true=Complete，false=Error）
+     */
+    private suspend fun processSseStream(
+        stream: Flow<SseEvent>,
+        onComplete: suspend (fullResponse: String, modelName: String, generationTimeMs: Long) -> Unit,
+        onError: suspend (fullResponse: String, modelName: String, errorMessage: String) -> Unit
+    ): Boolean {
+        var fullResponse = ""
+        var modelName = AppConfig.AiAssistant.DEFAULT_MODEL
+
+        // 节流控制变量
+        var pendingContent = ""
+        var lastUpdateTime = System.currentTimeMillis()
+        var charsSinceUpdate = 0
+
+        var success = false
+
+        stream.collect { event ->
+            when (event) {
+                is SseEvent.Data -> {
+                    fullResponse += event.content
+                    pendingContent += event.content
+                    charsSinceUpdate += event.content.length
+
+                    val currentTime = System.currentTimeMillis()
+                    val timeSinceLastUpdate = currentTime - lastUpdateTime
+
+                    val shouldUpdateImmediately = event.content.any { it in AppConfig.AiAssistant.STREAM_IMMEDIATE_UPDATE_CHARS } ||
+                            charsSinceUpdate >= AppConfig.AiAssistant.STREAM_MAX_CHARS_BEFORE_UPDATE ||
+                            timeSinceLastUpdate >= AppConfig.AiAssistant.STREAM_MIN_UPDATE_INTERVAL_MS
+
+                    if (shouldUpdateImmediately) {
+                        val currentMessages = _messages.value
+                        val lastMsg = currentMessages.lastOrNull()
+                        val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
+                            lastMsg.timestamp
+                        } else {
+                            System.currentTimeMillis()
+                        }
+                        updateLastMessage(ChatMessage.StreamingAi(
+                            content = fullResponse,
+                            model = modelName,
+                            timestamp = timestamp
+                        ))
+
+                        pendingContent = ""
+                        lastUpdateTime = currentTime
+                        charsSinceUpdate = 0
+                    }
+                }
+                is SseEvent.Complete -> {
+                    modelName = event.model
+                    val generationTimeMs = event.duration / AppConfig.AiAssistant.NANOSECONDS_TO_MILLISECONDS
+
+                    // 刷新剩余待更新内容
+                    if (pendingContent.isNotEmpty()) {
+                        val currentMessages = _messages.value
+                        val lastMsg = currentMessages.lastOrNull()
+                        val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
+                            lastMsg.timestamp
+                        } else {
+                            System.currentTimeMillis()
+                        }
+                        updateLastMessage(ChatMessage.StreamingAi(
+                            content = fullResponse,
+                            model = modelName,
+                            timestamp = timestamp
+                        ))
+                    }
+
+                    onComplete(fullResponse, modelName, generationTimeMs)
+                    success = true
+                }
+                is SseEvent.Error -> {
+                    // 刷新剩余待更新内容
+                    if (pendingContent.isNotEmpty()) {
+                        val currentMessages = _messages.value
+                        val lastMsg = currentMessages.lastOrNull()
+                        val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
+                            lastMsg.timestamp
+                        } else {
+                            System.currentTimeMillis()
+                        }
+                        updateLastMessage(ChatMessage.StreamingAi(
+                            content = fullResponse,
+                            model = modelName,
+                            timestamp = timestamp
+                        ))
+                    }
+
+                    onError(fullResponse, modelName, event.message)
+                }
+            }
+        }
+
+        return success
     }
 
     /**
@@ -752,6 +781,8 @@ class AiAssistantViewModel @Inject constructor(
      * 加载用户历史记录列表
      * 统一使用 HistoryRecordRepository 作为入口，与历史记录页面共享缓存
      * 通过 Flow 观察 Repository 状态，确保数据就绪后再更新UI
+     *
+     * 优化：使用 withTimeoutOrNull 防止 Flow collect 无限挂起
      */
     fun loadHistoryRecords(token: String) {
         _isLoadingHistory.value = true
@@ -773,16 +804,21 @@ class AiAssistantViewModel @Inject constructor(
                     endDate = null
                 )
 
-                // 等待加载完成并收集结果
-                historyRecordRepository.recordsFlow.collect { records ->
-                    if (records.isNotEmpty() || !historyRecordRepository.isLoadingFlow.value) {
-                        _historyRecords.value = records
-                        _isLoadingHistory.value = false
-                        return@collect
+                // 等待加载完成并收集结果，设置30秒超时防止无限挂起
+                val records = withTimeoutOrNull(30_000) {
+                    historyRecordRepository.recordsFlow.first { records ->
+                        records.isNotEmpty() || !historyRecordRepository.isLoadingFlow.value
                     }
+                }
+
+                if (records != null) {
+                    _historyRecords.value = records
+                } else {
+                    onError?.invoke("加载历史记录超时，请检查网络连接")
                 }
             } catch (e: Exception) {
                 onError?.invoke("加载历史记录失败: ${e.message}")
+            } finally {
                 _isLoadingHistory.value = false
             }
         }
@@ -821,140 +857,62 @@ class AiAssistantViewModel @Inject constructor(
             val streamingMessage = ChatMessage.StreamingAi("", AppConfig.AiAssistant.DEFAULT_MODEL)
             addMessage(streamingMessage)
 
-            var fullResponse = ""
-            var modelName = AppConfig.AiAssistant.DEFAULT_MODEL
-            
-            // 节流控制变量
-            var pendingContent = ""
-            var lastUpdateTime = System.currentTimeMillis()  // 初始化为当前时间避免首次立即更新
-            var charsSinceUpdate = 0
-
-            // 使用 Repository 进行流式分析
+            // 使用提取的通用流式处理方法
             currentSseJob = launch {
-                aiAssistantRepository.analyzeRecordStream(
+                val stream = aiAssistantRepository.analyzeRecordStream(
                     recordId = recordId,
                     token = token,
                     enableThinking = _enableThinking.value,
                     onStateChange = { state ->
                         _connectionState.value = state
                     }
-                ).collect { event ->
-                    when (event) {
-                        is SseEvent.Data -> {
-                            // 累积响应内容
-                            fullResponse += event.content
-                            pendingContent += event.content
-                            charsSinceUpdate += event.content.length
-                            
-                            val currentTime = System.currentTimeMillis()
-                            val timeSinceLastUpdate = currentTime - lastUpdateTime
-                            
-                            // 检查是否需要立即更新
-                            val shouldUpdateImmediately = event.content.any { it in AppConfig.AiAssistant.STREAM_IMMEDIATE_UPDATE_CHARS } ||
-                                    charsSinceUpdate >= AppConfig.AiAssistant.STREAM_MAX_CHARS_BEFORE_UPDATE ||
-                                    timeSinceLastUpdate >= AppConfig.AiAssistant.STREAM_MIN_UPDATE_INTERVAL_MS
-                            
-                            if (shouldUpdateImmediately) {
-                                val currentMessages = _messages.value
-                                val lastMsg = currentMessages.lastOrNull()
-                                val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
-                                    lastMsg.timestamp
-                                } else {
-                                    System.currentTimeMillis()
-                                }
-                                updateLastMessage(ChatMessage.StreamingAi(
-                                    content = fullResponse,
-                                    model = modelName,
-                                    timestamp = timestamp
-                                ))
-                                
-                                // 重置节流变量
-                                pendingContent = ""
-                                lastUpdateTime = currentTime
-                                charsSinceUpdate = 0
-                            }
-                        }
-                        is SseEvent.Complete -> {
-                            modelName = event.model
-                            val generationTimeMs = event.duration / AppConfig.AiAssistant.NANOSECONDS_TO_MILLISECONDS
-                            
-                            // 确保所有待更新内容都刷新到UI
-                            if (pendingContent.isNotEmpty()) {
-                                val currentMessages = _messages.value
-                                val lastMsg = currentMessages.lastOrNull()
-                                val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
-                                    lastMsg.timestamp
-                                } else {
-                                    System.currentTimeMillis()
-                                }
-                                updateLastMessage(ChatMessage.StreamingAi(
-                                    content = fullResponse,
-                                    model = modelName,
-                                    timestamp = timestamp
-                                ))
-                            }
-                            
-                            // 直接将流式消息转换为AI消息，避免两次更新
+                )
+
+                processSseStream(
+                    stream = stream,
+                    onComplete = { fullResponse, modelName, generationTimeMs ->
+                        replaceLastMessage(ChatMessage.Ai(
+                            content = fullResponse,
+                            model = modelName,
+                            generationTimeMs = generationTimeMs
+                        ))
+                        // 保存到缓存
+                        analysisCache[recordId] = CachedAnalysisResult(
+                            advice = fullResponse,
+                            model = modelName,
+                            generationTimeMs = generationTimeMs
+                        )
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            lastGenerationTimeMs = generationTimeMs
+                        )
+                        _connectionState.value = SseConnectionState.Idle
+                        currentSseJob = null
+                    },
+                    onError = { fullResponse, modelName, errorMessage ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = errorMessage
+                        )
+                        onError?.invoke(errorMessage)
+
+                        if (fullResponse.isNotEmpty()) {
                             replaceLastMessage(ChatMessage.Ai(
-                                content = fullResponse,
+                                content = fullResponse + "\n\n[分析中断: $errorMessage]",
                                 model = modelName,
-                                generationTimeMs = generationTimeMs
+                                generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
                             ))
-                            // 保存到缓存
-                            analysisCache[recordId] = CachedAnalysisResult(
-                                advice = fullResponse,
-                                model = modelName,
-                                generationTimeMs = generationTimeMs
-                            )
-                            _uiState.value = _uiState.value.copy(
-                                isLoading = false,
-                                lastGenerationTimeMs = generationTimeMs
-                            )
-                            _connectionState.value = SseConnectionState.Idle
-                            currentSseJob = null  // 重置任务引用
+                        } else {
+                            replaceLastMessage(ChatMessage.Ai(
+                                content = "[分析失败: $errorMessage]",
+                                model = AppConfig.AiAssistant.ERROR_MODEL,
+                                generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
+                            ))
                         }
-                        is SseEvent.Error -> {
-                            _uiState.value = _uiState.value.copy(
-                                isLoading = false,
-                                error = event.message
-                            )
-                            onError?.invoke(event.message)
-                            
-                            // 确保所有待更新内容都刷新到UI
-                            if (pendingContent.isNotEmpty()) {
-                                val currentMessages = _messages.value
-                                val lastMsg = currentMessages.lastOrNull()
-                                val timestamp = if (lastMsg is ChatMessage.StreamingAi) {
-                                    lastMsg.timestamp
-                                } else {
-                                    System.currentTimeMillis()
-                                }
-                                updateLastMessage(ChatMessage.StreamingAi(
-                                    content = fullResponse,
-                                    model = modelName,
-                                    timestamp = timestamp
-                                ))
-                            }
-                            
-                            // 保留已生成的内容
-                            if (fullResponse.isNotEmpty()) {
-                                replaceLastMessage(ChatMessage.Ai(
-                                    content = fullResponse + "\n\n[分析中断: ${event.message}]",
-                                    model = modelName,
-                                    generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
-                                ))
-                            } else {
-                                replaceLastMessage(ChatMessage.Ai(
-                                    content = "[分析失败: ${event.message}]",
-                                    model = AppConfig.AiAssistant.ERROR_MODEL,
-                                    generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
-                                ))
-                            }
-                            _connectionState.value = SseConnectionState.Error(event.message)
-                            currentSseJob = null  // 重置任务引用
-                        }
+                        _connectionState.value = SseConnectionState.Error(errorMessage)
+                        currentSseJob = null
                     }
-                }
+                )
             }
         }
     }

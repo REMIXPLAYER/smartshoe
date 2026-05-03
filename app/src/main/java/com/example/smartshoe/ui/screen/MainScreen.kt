@@ -113,19 +113,12 @@ private fun MainAppScreen(
     callbacks: MainScreenCallbacks,
     modifier: Modifier = Modifier
 ) {
-    // 使用remember稳定列表参数，避免不必要的重组
-    val stableScannedDevices by remember(state.scannedDevices) {
-        derivedStateOf { state.scannedDevices }
-    }
-    val stableSensorColors by remember(state.sensorColors) {
-        derivedStateOf { state.sensorColors }
-    }
-    val stableExtraValues by remember(state.extraValues) {
-        derivedStateOf { state.extraValues }
-    }
-    val stablePressureStatuses by remember(state.pressureStatuses) {
-        derivedStateOf { state.pressureStatuses }
-    }
+    // 列表类型参数已经是稳定的（data class + immutable list），直接使用
+    // 当 state 对象变化但列表内容不变时，Compose 会自动跳过重组
+    val stableScannedDevices = state.scannedDevices
+    val stableSensorColors = state.sensorColors
+    val stableExtraValues = state.extraValues
+    val stablePressureStatuses = state.pressureStatuses
 
     // AI助手ViewModel和状态
     val aiViewModel = callbacks.aiAssistantViewModel
