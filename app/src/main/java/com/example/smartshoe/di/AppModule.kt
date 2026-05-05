@@ -92,8 +92,8 @@ abstract class AppModule {
         @Singleton
         fun provideOkHttpClient(): OkHttpClient {
             return OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(120, TimeUnit.SECONDS)  // SSE需要长超时
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(200, TimeUnit.SECONDS)  // SSE长连接，匹配服务器180s超时
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
         }
@@ -108,7 +108,9 @@ abstract class AppModule {
                 context,
                 AppDatabase::class.java,
                 AppDatabase.DATABASE_NAME
-            ).build()
+            )
+                .fallbackToDestructiveMigration()  // 数据库版本升级时重建数据库
+                .build()
         }
 
         /**

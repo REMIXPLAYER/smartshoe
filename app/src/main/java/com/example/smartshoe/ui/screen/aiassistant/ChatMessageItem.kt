@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.ui.theme.AppColors
-import com.example.smartshoe.ui.viewmodel.ChatMessage
+import com.example.smartshoe.domain.model.ChatMessage
 
 /**
  * 聊天消息项 - 根据消息类型分发到对应的渲染组件

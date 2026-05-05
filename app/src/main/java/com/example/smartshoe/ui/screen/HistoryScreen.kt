@@ -1,16 +1,16 @@
 package com.example.smartshoe.ui.screen
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,9 +23,10 @@ import java.util.Date
 
 /**
  * 历史记录主界面
- * 新增：支持AI分析功能
+ * 支持AI分析功能
  *
- * 架构：主Screen文件只负责组合子组件，具体UI实现拆分到 screen/history/components/ 目录
+ * 架构：主Screen文件只负责组合子组件，具体UI实现拆分到 screen/history/ 目录
+ * 详情页覆盖在卡片上方（非全屏），从右侧滑入/滑出
  */
 @Composable
 fun HistoryScreen(
@@ -53,28 +54,76 @@ fun HistoryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            DateTimeSelector(
-                startDate = startDate,
-                endDate = endDate,
-                onStartDateChange = onStartDateChange,
-                onEndDateChange = onEndDateChange,
-                onQueryClick = onQueryClick,
-                isLoading = isLoading,
-                records = records,
-                selectedRecord = selectedRecord,
-                queryExecuted = queryExecuted,
-                onRecordToggle = { record ->
-                    if (selectedRecord?.recordId == record.recordId) {
-                        onRecordSelect(null)
-                    } else {
-                        onRecordSelect(record)
+            // 卡片容器：详情页在此 Box 内覆盖展示，区域受卡片约束而非全屏
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 680.dp)
+            ) {
+                DateTimeSelector(
+                    startDate = startDate,
+                    endDate = endDate,
+                    onStartDateChange = onStartDateChange,
+                    onEndDateChange = onEndDateChange,
+                    onQueryClick = onQueryClick,
+                    isLoading = isLoading,
+                    records = records,
+                    selectedRecord = selectedRecord,
+                    queryExecuted = queryExecuted,
+                    onRecordToggle = { record ->
+                        if (selectedRecord?.recordId == record.recordId) {
+                            onRecordSelect(null)
+                        } else {
+                            onRecordSelect(record)
+                        }
+                    },
+                    onShowDatePicker = onShowDatePicker
+                )
+
+                // 详情覆盖层：在卡片区域内从右侧滑入/滑出
+                // 使用 AnimatedVisibility + remember 保存记录值，确保动画期间内容不消失
+                val lastSelectedRecord = remember { mutableStateOf<SensorDataRecord?>(null) }
+                if (selectedRecord != null) {
+                    lastSelectedRecord.value = selectedRecord
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = selectedRecord != null,
+                    enter = slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(durationMillis = 300)
+                    ),
+                    exit = slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(durationMillis = 300)
+                    ),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .align(Alignment.TopStart)
+                ) {
+                    lastSelectedRecord.value?.let { record ->
+                        if (isRecordDetailLoading) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(AppColors.Surface),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = AppColors.Primary)
+                            }
+                        } else {
+                            SelectedRecordDetail(
+                                record = record,
+                                data = recordData,
+                                onBackClick = { onRecordSelect(null) },
+                                onAiAnalysisClick = onAiAnalysisClick
+                            )
+                        }
                     }
-                },
-                onShowDatePicker = onShowDatePicker
-            )
+                }
+            }
 
             if (isLoading) {
                 Box(
@@ -85,44 +134,6 @@ fun HistoryScreen(
                 ) {
                     CircularProgressIndicator(color = AppColors.Primary)
                 }
-            }
-        }
-
-        AnimatedContent(
-            targetState = selectedRecord,
-            transitionSpec = {
-                slideInHorizontally(
-                    initialOffsetX = { it },
-                    animationSpec = tween(durationMillis = 300)
-                ) togetherWith
-                slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = tween(durationMillis = 300)
-                )
-            },
-            modifier = Modifier.fillMaxSize(),
-            label = "record_detail_animation"
-        ) { targetRecord ->
-            if (targetRecord != null) {
-                if (isRecordDetailLoading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(AppColors.Background),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = AppColors.Primary)
-                    }
-                } else {
-                    SelectedRecordDetail(
-                        record = targetRecord,
-                        data = recordData,
-                        onBackClick = { onRecordSelect(null) },
-                        onAiAnalysisClick = onAiAnalysisClick
-                    )
-                }
-            } else {
-                Box(modifier = Modifier.fillMaxSize())
             }
         }
     }

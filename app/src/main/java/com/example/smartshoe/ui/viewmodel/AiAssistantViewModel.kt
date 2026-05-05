@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartshoe.domain.model.AiConversation
 import com.example.smartshoe.domain.model.AiStatusResult
+import com.example.smartshoe.domain.model.ChatMessage
 import com.example.smartshoe.domain.model.HealthAdviceResult
 import com.example.smartshoe.domain.model.SseConnectionState
 import com.example.smartshoe.domain.model.SseEvent
@@ -26,7 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
-import java.lang.ref.WeakReference
+import java.text.SimpleDateFormat
 import java.util.Collections
 import javax.inject.Inject
 
@@ -86,20 +87,21 @@ class AiAssistantViewModel @Inject constructor(
     // Mutex 用于保护消息列表的并发修改，防止竞态条件
     private val messagesMutex = Mutex()
 
-    // 错误回调 - 使用WeakReference避免内存泄漏
-    private var onErrorRef: WeakReference<((String) -> Unit)>? = null
-
-    var onError: ((String) -> Unit)?
-        get() = onErrorRef?.get()
-        set(value) {
-            onErrorRef = value?.let { WeakReference(it) }
-        }
+    // 错误回调 - ViewModel内部使用
+    private var onError: ((String) -> Unit)? = null
 
     // ==================== 多对话管理 ====================
 
     // 当前对话ID
     private val _currentConversationId = MutableStateFlow<String?>(null)
     val currentConversationId: StateFlow<String?> = _currentConversationId.asStateFlow()
+
+    // 最后阅读位置
+    private val _lastReadPosition = MutableStateFlow(-1f)
+    val lastReadPosition: StateFlow<Float> = _lastReadPosition.asStateFlow()
+
+    private val _restoredConversationId = MutableStateFlow<String?>(null)
+    val restoredConversationId: StateFlow<String?> = _restoredConversationId.asStateFlow()
 
     // 所有对话列表
     private val _conversations = MutableStateFlow<List<AiConversation>>(emptyList())
@@ -173,8 +175,14 @@ class AiAssistantViewModel @Inject constructor(
     fun sendMessage(message: String, token: String) {
         if (message.isBlank()) return
 
+        // 防重入：如果正在加载中，忽略重复请求
+        if (_uiState.value.isLoading) {
+            return
+        }
+
         // 取消之前的请求
         currentSseJob?.cancel()
+        currentSseJob = null
 
         currentSseJob = viewModelScope.launch {
             // 添加用户消息
@@ -199,15 +207,28 @@ class AiAssistantViewModel @Inject constructor(
             processSseStream(
                 stream = stream,
                 onComplete = { fullResponse, modelName, generationTimeMs ->
-                    replaceLastMessage(ChatMessage.Ai(
-                        content = fullResponse,
-                        model = modelName,
-                        generationTimeMs = generationTimeMs
-                    ))
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        lastGenerationTimeMs = generationTimeMs
-                    )
+                    if (fullResponse.isBlank()) {
+                        // 如果内容为空，说明服务器未返回有效内容，显示错误信息
+                        replaceLastMessage(ChatMessage.Ai(
+                            content = "[生成失败: 服务器未返回有效内容]",
+                            model = AppConfig.AiAssistant.ERROR_MODEL,
+                            generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
+                        ))
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "服务器未返回有效内容"
+                        )
+                    } else {
+                        replaceLastMessage(ChatMessage.Ai(
+                            content = fullResponse,
+                            model = modelName,
+                            generationTimeMs = generationTimeMs
+                        ))
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            lastGenerationTimeMs = generationTimeMs
+                        )
+                    }
                     _connectionState.value = SseConnectionState.Idle
                     currentSseJob = null
                 },
@@ -291,7 +312,7 @@ class AiAssistantViewModel @Inject constructor(
         stream: Flow<SseEvent>,
         onComplete: suspend (fullResponse: String, modelName: String, generationTimeMs: Long) -> Unit,
         onError: suspend (fullResponse: String, modelName: String, errorMessage: String) -> Unit
-    ): Boolean {
+    ) {
         var fullResponse = ""
         var modelName = AppConfig.AiAssistant.DEFAULT_MODEL
 
@@ -299,8 +320,6 @@ class AiAssistantViewModel @Inject constructor(
         var pendingContent = ""
         var lastUpdateTime = System.currentTimeMillis()
         var charsSinceUpdate = 0
-
-        var success = false
 
         stream.collect { event ->
             when (event) {
@@ -356,7 +375,6 @@ class AiAssistantViewModel @Inject constructor(
                     }
 
                     onComplete(fullResponse, modelName, generationTimeMs)
-                    success = true
                 }
                 is SseEvent.Error -> {
                     // 刷新剩余待更新内容
@@ -379,8 +397,6 @@ class AiAssistantViewModel @Inject constructor(
                 }
             }
         }
-
-        return success
     }
 
     /**
@@ -406,6 +422,7 @@ class AiAssistantViewModel @Inject constructor(
      * 替换后的最终消息会保存到数据库
      */
     private suspend fun replaceLastMessage(message: ChatMessage) {
+        var conversationId: String? = null
         messagesMutex.withLock {
             val currentList = _messages.value
             if (currentList.isNotEmpty()) {
@@ -414,14 +431,14 @@ class AiAssistantViewModel @Inject constructor(
                     add(message)
                 }
                 _messages.value = newList
+                conversationId = _currentConversationId.value
+            }
+        }
 
-                // 保存替换后的最终消息到数据库
-                if (message !is ChatMessage.StreamingAi) {
-                    _currentConversationId.value?.let { conversationId ->
-                        conversationRepository.saveMessage(conversationId, message)
-                        conversationRepository.updateConversationTime(conversationId)
-                    }
-                }
+        conversationId?.let { idToSave ->
+            if (message !is ChatMessage.StreamingAi) {
+                conversationRepository.saveMessage(idToSave, message)
+                conversationRepository.updateConversationTime(idToSave)
             }
         }
     }
@@ -471,7 +488,12 @@ class AiAssistantViewModel @Inject constructor(
         viewModelScope.launch {
             val savedId = savedStateHandle.get<String>(KEY_CURRENT_CONVERSATION_ID)
             if (savedId != null) {
-                // 尝试恢复上次对话
+                // 尝试恢复上次对话，并恢复滚动位置
+                val conversation = conversationRepository.getAllConversations().first()
+                    .find { it.id == savedId }
+                conversation?.let {
+                    _lastReadPosition.value = it.lastReadPosition
+                }
                 switchToConversation(savedId)
                 return@launch
             }
@@ -479,13 +501,13 @@ class AiAssistantViewModel @Inject constructor(
             // 没有保存的ID，检查数据库中是否已有对话
             val existingConversations = conversationRepository.getAllConversations().first()
             if (existingConversations.isNotEmpty()) {
-                // 切换到最新的对话（按更新时间排序的第一个）
                 val latestConversation = existingConversations.maxByOrNull { it.updatedAt }
                 latestConversation?.let {
-                    _currentConversationId.value = it.id
-                    savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = it.id
                     val messageList = conversationRepository.getMessagesByConversationId(it.id).first()
                     _messages.value = messageList
+                    _lastReadPosition.value = it.lastReadPosition
+                    _currentConversationId.value = it.id
+                    savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = it.id
                 }
             } else {
                 // 首次使用，创建新对话
@@ -502,10 +524,9 @@ class AiAssistantViewModel @Inject constructor(
             _isLoadingConversations.value = true
             try {
                 val newId = conversationRepository.createConversation("新对话")
-                _currentConversationId.value = newId
                 savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = newId
+                _currentConversationId.value = newId
                 _messages.value = emptyList()
-                // 添加欢迎消息（addMessage内部会保存到数据库）
                 val welcomeMessage = ChatMessage.Ai(
                     "👋 您好！我是您的足部健康AI助手。\n\n" +
                     "我可以通过分析您的智能鞋垫传感器数据，为您提供：\n" +
@@ -516,6 +537,8 @@ class AiAssistantViewModel @Inject constructor(
                     "AI助手"
                 )
                 addMessage(welcomeMessage)
+                _lastReadPosition.value = -1f
+                _restoredConversationId.value = null
             } catch (e: Exception) {
                 onError?.invoke("创建对话失败: ${e.message}")
             } finally {
@@ -532,11 +555,21 @@ class AiAssistantViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoadingConversations.value = true
             try {
-                _currentConversationId.value = conversationId
-                savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = conversationId
-                // 只收集一次消息列表
+                _currentConversationId.value?.let { currentId ->
+                    if (currentId != conversationId) {
+                        saveCurrentScrollProgress(currentId, _lastReadPosition.value)
+                        _restoredConversationId.value = null
+                    }
+                }
+                val conversation = conversationRepository.getAllConversations().first()
+                    .find { it.id == conversationId }
                 val messageList = conversationRepository.getMessagesByConversationId(conversationId).first()
                 _messages.value = messageList
+                conversation?.let {
+                    _lastReadPosition.value = it.lastReadPosition
+                }
+                _currentConversationId.value = conversationId
+                savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = conversationId
             } catch (e: Exception) {
                 onError?.invoke("切换对话失败: ${e.message}")
             } finally {
@@ -683,21 +716,21 @@ class AiAssistantViewModel @Inject constructor(
         val shouldUpdateTitle = message is ChatMessage.User &&
             (conversations.find { it.id == currentId }?.title == "新对话")
         
+        var conversationId: String? = null
         messagesMutex.withLock {
             val currentList = _messages.value
             val newList = if (currentList.size >= AppConfig.AiAssistant.MAX_MESSAGE_COUNT) {
-                // 保留第一条欢迎消息，移除第二条（最旧的用户/AI消息）
                 listOf(currentList[0]) + currentList.drop(2).takeLast(AppConfig.AiAssistant.MAX_MESSAGE_COUNT - 2) + message
             } else {
                 currentList + message
             }
             _messages.value = newList
+            conversationId = _currentConversationId.value
+        }
 
-            // 保存到数据库（流式消息不保存，只保存最终状态）
+        conversationId?.let { idToSave ->
             if (message !is ChatMessage.StreamingAi) {
-                _currentConversationId.value?.let { conversationId ->
-                    conversationRepository.saveMessage(conversationId, message)
-                }
+                conversationRepository.saveMessage(idToSave, message)
             }
         }
 
@@ -710,6 +743,26 @@ class AiAssistantViewModel @Inject constructor(
         if (shouldUpdateTitle) {
             updateConversationTitleFromMessage(message.content)
         }
+    }
+
+    /**
+     * 保存最后阅读位置
+     */
+    fun saveLastReadPosition(progress: Float) {
+        _currentConversationId.value?.let { conversationId ->
+            _lastReadPosition.value = progress
+            viewModelScope.launch {
+                saveCurrentScrollProgress(conversationId, progress)
+            }
+        }
+    }
+
+    private suspend fun saveCurrentScrollProgress(conversationId: String, progress: Float) {
+        conversationRepository.updateLastReadPosition(conversationId, progress.coerceIn(0f, 1f))
+    }
+
+    fun markConversationRestored(conversationId: String) {
+        _restoredConversationId.value = conversationId
     }
 
     /**
@@ -829,10 +882,16 @@ class AiAssistantViewModel @Inject constructor(
      * 带缓存：避免重复分析同一条记录
      */
     fun analyzeRecord(recordId: String, token: String) {
+        // 防重入：如果正在加载中，忽略重复请求
+        if (_uiState.value.isLoading) {
+            return
+        }
+
         // 取消之前的请求
         currentSseJob?.cancel()
+        currentSseJob = null
 
-        viewModelScope.launch {
+        currentSseJob = viewModelScope.launch {
             // 检查缓存
             analysisCache[recordId]?.let { cachedResult ->
                 addMessage(ChatMessage.User("📊 分析历史记录: $recordId (来自缓存)"))
@@ -858,19 +917,30 @@ class AiAssistantViewModel @Inject constructor(
             addMessage(streamingMessage)
 
             // 使用提取的通用流式处理方法
-            currentSseJob = launch {
-                val stream = aiAssistantRepository.analyzeRecordStream(
-                    recordId = recordId,
-                    token = token,
-                    enableThinking = _enableThinking.value,
-                    onStateChange = { state ->
-                        _connectionState.value = state
-                    }
-                )
+            val stream = aiAssistantRepository.analyzeRecordStream(
+                recordId = recordId,
+                token = token,
+                enableThinking = _enableThinking.value,
+                onStateChange = { state ->
+                    _connectionState.value = state
+                }
+            )
 
-                processSseStream(
-                    stream = stream,
-                    onComplete = { fullResponse, modelName, generationTimeMs ->
+            processSseStream(
+                stream = stream,
+                onComplete = { fullResponse, modelName, generationTimeMs ->
+                    if (fullResponse.isBlank()) {
+                        // 如果内容为空，说明服务器未返回有效内容，显示错误信息
+                        replaceLastMessage(ChatMessage.Ai(
+                            content = "[分析失败: 服务器未返回有效内容]",
+                            model = AppConfig.AiAssistant.ERROR_MODEL,
+                            generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
+                        ))
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "服务器未返回有效内容"
+                        )
+                    } else {
                         replaceLastMessage(ChatMessage.Ai(
                             content = fullResponse,
                             model = modelName,
@@ -886,34 +956,34 @@ class AiAssistantViewModel @Inject constructor(
                             isLoading = false,
                             lastGenerationTimeMs = generationTimeMs
                         )
-                        _connectionState.value = SseConnectionState.Idle
-                        currentSseJob = null
-                    },
-                    onError = { fullResponse, modelName, errorMessage ->
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            error = errorMessage
-                        )
-                        onError?.invoke(errorMessage)
-
-                        if (fullResponse.isNotEmpty()) {
-                            replaceLastMessage(ChatMessage.Ai(
-                                content = fullResponse + "\n\n[分析中断: $errorMessage]",
-                                model = modelName,
-                                generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
-                            ))
-                        } else {
-                            replaceLastMessage(ChatMessage.Ai(
-                                content = "[分析失败: $errorMessage]",
-                                model = AppConfig.AiAssistant.ERROR_MODEL,
-                                generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
-                            ))
-                        }
-                        _connectionState.value = SseConnectionState.Error(errorMessage)
-                        currentSseJob = null
                     }
-                )
-            }
+                    _connectionState.value = SseConnectionState.Idle
+                    currentSseJob = null
+                },
+                onError = { fullResponse, modelName, errorMessage ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = errorMessage
+                    )
+                    onError?.invoke(errorMessage)
+
+                    if (fullResponse.isNotEmpty()) {
+                        replaceLastMessage(ChatMessage.Ai(
+                            content = fullResponse + "\n\n[分析中断: $errorMessage]",
+                            model = modelName,
+                            generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
+                        ))
+                    } else {
+                        replaceLastMessage(ChatMessage.Ai(
+                            content = "[分析失败: $errorMessage]",
+                            model = AppConfig.AiAssistant.ERROR_MODEL,
+                            generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
+                        ))
+                    }
+                    _connectionState.value = SseConnectionState.Error(errorMessage)
+                    currentSseJob = null
+                }
+            )
         }
     }
 }
@@ -938,39 +1008,4 @@ sealed class AiServiceStatus {
     data class Error(val message: String) : AiServiceStatus()
 }
 
-/**
- * 对话消息
- */
-sealed class ChatMessage {
-    abstract val content: String
-    abstract val timestamp: Long
 
-    data class User(
-        override val content: String,
-        override val timestamp: Long = System.currentTimeMillis()
-    ) : ChatMessage()
-
-    data class Ai(
-        override val content: String,
-        val model: String,
-        val generationTimeMs: Long = 0,
-        override val timestamp: Long = System.currentTimeMillis()
-    ) : ChatMessage()
-
-    data class HealthAdvice(
-        override val content: String,
-        val summary: com.example.smartshoe.domain.model.HealthAdviceSummary?,
-        val model: String,
-        val generationTimeMs: Long = 0,
-        override val timestamp: Long = System.currentTimeMillis()
-    ) : ChatMessage()
-
-    /**
-     * 流式AI消息 - 用于实时显示生成中的内容
-     */
-    data class StreamingAi(
-        override val content: String,
-        val model: String,
-        override val timestamp: Long = System.currentTimeMillis()
-    ) : ChatMessage()
-}

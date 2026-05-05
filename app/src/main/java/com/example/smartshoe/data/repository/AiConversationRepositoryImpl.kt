@@ -5,8 +5,8 @@ import com.example.smartshoe.data.local.dao.AiMessageDao
 import com.example.smartshoe.data.local.entity.AiConversationEntity
 import com.example.smartshoe.data.local.entity.AiMessageEntity
 import com.example.smartshoe.domain.model.AiConversation
+import com.example.smartshoe.domain.model.ChatMessage
 import com.example.smartshoe.domain.repository.AiConversationRepository
-import com.example.smartshoe.ui.viewmodel.ChatMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -84,6 +84,10 @@ class AiConversationRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateLastReadPosition(conversationId: String, position: Float) {
+        conversationDao.updateLastReadPosition(conversationId, position)
+    }
+
     override suspend fun deleteConversation(conversationId: String) {
         conversationDao.deleteConversationById(conversationId)
         messageDao.deleteMessagesByConversationId(conversationId)
@@ -102,7 +106,8 @@ class AiConversationRepositoryImpl @Inject constructor(
             title = title,
             createdAt = createdAt,
             updatedAt = updatedAt,
-            messageCount = messageCount
+            messageCount = messageCount,
+            lastReadPosition = lastReadPosition
         )
     }
 

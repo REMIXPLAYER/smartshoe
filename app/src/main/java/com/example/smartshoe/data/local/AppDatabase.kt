@@ -16,7 +16,7 @@ import com.example.smartshoe.data.local.entity.AiMessageEntity
         AiConversationEntity::class,
         AiMessageEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

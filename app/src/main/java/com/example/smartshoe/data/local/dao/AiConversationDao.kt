@@ -41,4 +41,7 @@ interface AiConversationDao {
 
     @Query("UPDATE ai_conversations SET messageCount = (SELECT COUNT(*) FROM ai_messages WHERE conversationId = :conversationId) WHERE id = :conversationId")
     suspend fun updateMessageCount(conversationId: String)
+
+    @Query("UPDATE ai_conversations SET lastReadPosition = :position WHERE id = :conversationId")
+    suspend fun updateLastReadPosition(conversationId: String, position: Float)
 }

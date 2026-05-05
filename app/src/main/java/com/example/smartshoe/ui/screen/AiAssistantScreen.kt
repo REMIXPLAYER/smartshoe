@@ -14,16 +14,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.smartshoe.ui.screen.aiassistant.*
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppDimensions
 import com.example.smartshoe.ui.viewmodel.AiAssistantViewModel
-import com.example.smartshoe.ui.viewmodel.ChatMessage
+import com.example.smartshoe.domain.model.ChatMessage
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * AI助手屏幕主入口
@@ -46,24 +49,23 @@ fun AiAssistantScreen(
     val enableThinking by viewModel.enableThinking.collectAsStateWithLifecycle()
     val historyRecords by viewModel.historyRecords.collectAsStateWithLifecycle()
     val isLoadingHistory by viewModel.isLoadingHistory.collectAsStateWithLifecycle()
+    val currentConversationId by viewModel.currentConversationId.collectAsStateWithLifecycle()
+    val lastReadPosition by viewModel.lastReadPosition.collectAsStateWithLifecycle()
+    val restoredConversationId by viewModel.restoredConversationId.collectAsStateWithLifecycle()
 
-    // 方案 B：使用普通 Column + verticalScroll
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
 
-    // UI 状态变量
     var inputText by remember { mutableStateOf("") }
     var isModeMenuExpanded by remember { mutableStateOf(false) }
     var showHistoryBottomSheet by remember { mutableStateOf(false) }
 
-    // 判断是否正在流式传输
     val isStreaming by remember(messages) {
         derivedStateOf {
             messages.isNotEmpty() && messages.last() is ChatMessage.StreamingAi
         }
     }
 
-    // 错误处理
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
             onShowError(it)
@@ -72,39 +74,31 @@ fun AiAssistantScreen(
     }
 
     // ==================== 智能滚动管理 ====================
-    var isFirstLoad by remember { mutableStateOf(true) }
     var isUserActionTriggered by remember { mutableStateOf(false) }
     var isFollowingMode by remember { mutableStateOf(false) }
     var isButtonScrollTriggered by remember { mutableStateOf(false) }
+    var isScrollRestored by remember(currentConversationId) { mutableStateOf(false) }
 
-    // 检测用户主动滚动 → 禁用跟随模式
+    val isScrollPositionRestored = restoredConversationId == currentConversationId
+
     LaunchedEffect(scrollState) {
         snapshotFlow { scrollState.isScrollInProgress }
             .collect { isScrolling ->
                 if (isScrolling && isStreaming && !isButtonScrollTriggered) {
                     isFollowingMode = false
                 }
-            }
-    }
-
-    // 监听滚动结束，重置按钮触发标志
-    LaunchedEffect(scrollState.value) {
-        snapshotFlow { scrollState.isScrollInProgress }
-            .collect { isScrolling ->
                 if (!isScrolling) {
                     isButtonScrollTriggered = false
                 }
             }
     }
 
-    // 流式传输跟随逻辑
     LaunchedEffect(messages.lastOrNull()?.content) {
         if (!isStreaming || !isFollowingMode) return@LaunchedEffect
         delay(25)
         scrollState.scrollTo(scrollState.maxValue)
     }
 
-    // 用户发送消息/选择历史记录后滚动到底部并启用跟随模式
     LaunchedEffect(messages.lastOrNull()) {
         if (messages.isEmpty()) return@LaunchedEffect
         if (isUserActionTriggered) {
@@ -115,11 +109,49 @@ fun AiAssistantScreen(
         }
     }
 
-    // 首次加载完成后标记
-    LaunchedEffect(Unit) {
-        if (isFirstLoad) {
-            delay(300)
-            isFirstLoad = false
+    LaunchedEffect(currentConversationId, messages.isNotEmpty()) {
+        val convId = currentConversationId ?: return@LaunchedEffect
+        if (isScrollRestored) return@LaunchedEffect
+        if (messages.isEmpty()) return@LaunchedEffect
+
+        if (scrollState.maxValue <= 0) {
+            withTimeoutOrNull(2000L) {
+                snapshotFlow { scrollState.maxValue }.first { it > 0 }
+            } ?: run {
+                isScrollRestored = true
+                viewModel.markConversationRestored(convId)
+                return@LaunchedEffect
+            }
+        }
+
+        if (lastReadPosition < 0f) {
+            scrollState.scrollTo(scrollState.maxValue)
+            isFollowingMode = true
+        } else {
+            val targetPosition = (scrollState.maxValue * lastReadPosition).toInt()
+            scrollState.scrollTo(targetPosition)
+            isFollowingMode = lastReadPosition >= 0.9f
+        }
+        isScrollRestored = true
+        viewModel.markConversationRestored(convId)
+    }
+
+    LaunchedEffect(currentConversationId) {
+        snapshotFlow { scrollState.isScrollInProgress }
+            .collect { isScrolling ->
+                if (!isScrolling && restoredConversationId == currentConversationId && scrollState.maxValue > 0) {
+                    val progress = scrollState.value.toFloat() / scrollState.maxValue.toFloat()
+                    viewModel.saveLastReadPosition(progress)
+                }
+            }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (scrollState.maxValue > 0) {
+                val progress = scrollState.value.toFloat() / scrollState.maxValue.toFloat()
+                viewModel.saveLastReadPosition(progress)
+            }
         }
     }
 
@@ -156,7 +188,8 @@ fun AiAssistantScreen(
                     .verticalScroll(scrollState)
                     .padding(paddingValues)
                     .padding(horizontal = AppDimensions.DefaultPadding)
-                    .padding(bottom = 80.dp),
+                    .padding(bottom = 80.dp)
+                    .graphicsLayer { alpha = if (isScrollRestored) 1f else 0f },
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Spacer(modifier = Modifier.height(76.dp))
@@ -195,8 +228,8 @@ fun AiAssistantScreen(
             // 滚动到底部/新消息按钮
             val showScrollToBottomButton by remember {
                 derivedStateOf {
-                    if (isFirstLoad) return@derivedStateOf false
                     if (messages.isEmpty()) return@derivedStateOf false
+                    if (!isScrollRestored) return@derivedStateOf false
                     val isNearBottom = scrollState.value >= scrollState.maxValue - 500
                     !isNearBottom
                 }

@@ -1,7 +1,7 @@
 package com.example.smartshoe.domain.repository
 
 import com.example.smartshoe.domain.model.AiConversation
-import com.example.smartshoe.ui.viewmodel.ChatMessage
+import com.example.smartshoe.domain.model.ChatMessage
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -54,6 +54,11 @@ interface AiConversationRepository {
      * 删除对话
      */
     suspend fun deleteConversation(conversationId: String)
+
+    /**
+     * 更新最后阅读位置
+     */
+    suspend fun updateLastReadPosition(conversationId: String, position: Float)
 
     /**
      * 删除所有对话

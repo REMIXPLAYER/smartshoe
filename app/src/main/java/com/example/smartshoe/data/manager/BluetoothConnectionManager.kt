@@ -172,25 +172,21 @@ class BluetoothConnectionManager @Inject constructor(
             // 创建 Socket
             val socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
 
-            // 连接（带超时）
-            val connectJob = launch {
+            // 连接（带超时，10秒）
+            var connectError: String? = null
+            val connectResult = withTimeoutOrNull(10000) {
                 try {
                     socket.connect()
+                    true
                 } catch (e: Exception) {
-                    Log.e(TAG, "Socket connect error: ${e.message}")
-                    throw e
+                    connectError = e.message
+                    Log.e(TAG, "Socket connect error: ${e.message}", e)
+                    false
                 }
-            }
-
-            // 等待连接完成或超时（10秒）
-            val connectResult = withTimeoutOrNull(10000) {
-                connectJob.join()
-                true
             }
 
             if (connectResult == null) {
                 // 连接超时
-                connectJob.cancel()
                 closeSocketSafely(socket)
                 Log.e(TAG, "Connection timeout")
                 emitError("连接超时，请重试")
@@ -198,12 +194,12 @@ class BluetoothConnectionManager @Inject constructor(
                 return@withContext false
             }
 
-            // 检查连接是否成功
-            if (!socket.isConnected) {
+            if (connectResult == false || !socket.isConnected) {
                 closeSocketSafely(socket)
                 Log.e(TAG, "Socket not connected after connect()")
-                emitError("连接失败")
-                emitConnectionResult(false, "连接失败")
+                val errorMsg = if (connectError != null) "连接失败: $connectError" else "连接失败"
+                emitError(errorMsg)
+                emitConnectionResult(false, errorMsg)
                 return@withContext false
             }
 

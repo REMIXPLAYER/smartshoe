@@ -82,6 +82,9 @@ class SensorDataViewModel @Inject constructor(
     private val _pressureAlertsEnabled = MutableStateFlow(true)
     val pressureAlertsEnabled: StateFlow<Boolean> = _pressureAlertsEnabled.asStateFlow()
 
+    // 上次警告时间（用于冷却机制）
+    private var lastAlertTime = 0L
+
     // 蓝牙错误状态（从 BluetoothConnectionManager 转发）
     private val _bluetoothError = MutableSharedFlow<String>(extraBufferCapacity = 16)
     val bluetoothError: SharedFlow<String> = _bluetoothError.asSharedFlow()
@@ -178,15 +181,18 @@ class SensorDataViewModel @Inject constructor(
      * 报警阈值：滑动窗口加权平均值 > 1350
      */
     private fun checkAndTriggerPressureAlertsFromWeighted() {
+        val now = System.currentTimeMillis()
+        if (now - lastAlertTime < AppConfig.UI.ALERT_COOLDOWN_MS) return
+
         val weightedAvgs = sensorDataRepository.getWeightedAverages()
 
-        // 找到第一个超过报警阈值的传感器（加权平均值 > 1350）
         val alertIndex = weightedAvgs.indexOfFirst { it > PRESSURE_ALERT_THRESHOLD }
 
         if (alertIndex != -1) {
             val sensorNames = listOf("脚掌前部", "脚弓部", "脚跟部")
             _alertMessage.value = "${sensorNames[alertIndex]} 压力异常，请注意足部健康哦~"
             _showAlertDialog.value = true
+            lastAlertTime = now
         }
     }
 
@@ -297,6 +303,7 @@ class SensorDataViewModel @Inject constructor(
      */
     fun dismissAlertDialog() {
         _showAlertDialog.value = false
+        lastAlertTime = System.currentTimeMillis()
     }
 
     /**

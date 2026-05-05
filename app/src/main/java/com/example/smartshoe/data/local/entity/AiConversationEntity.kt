@@ -14,5 +14,6 @@ data class AiConversationEntity(
     val title: String,
     val createdAt: Long,
     val updatedAt: Long,
-    val messageCount: Int = 0
+    val messageCount: Int = 0,
+    val lastReadPosition: Float = -1f
 )

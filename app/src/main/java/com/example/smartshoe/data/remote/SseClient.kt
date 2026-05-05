@@ -126,20 +126,27 @@ class SseClient @Inject constructor(
         onStateChange?.invoke(SseConnectionState.Connecting)
 
         val request = requestBuilder()
+        var isActive = true
 
         val listener = object : EventSourceListener() {
             override fun onOpen(eventSource: EventSource, response: Response) {
+                if (!isActive) return
                 Log.d(TAG, "SSE connection opened")
                 onStateChange?.invoke(SseConnectionState.Connected)
             }
 
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+                if (!isActive) return
                 when (type) {
                     null, "message" -> {
                         val sendResult = trySend(SseEvent.Data(data))
                         if (sendResult.isFailure) {
                             Log.w(TAG, "Failed to send data event, channel may be closed")
                         }
+                    }
+                    "connected" -> {
+                        // 服务器连接成功事件，记录日志但不传递给业务层
+                        Log.d(TAG, "Server connection confirmed")
                     }
                     "complete" -> {
                         runCatching {
@@ -156,11 +163,9 @@ class SseClient @Inject constructor(
                     }
                     "error" -> {
                         val errorMessage = runCatching {
-                            // 尝试解析为JSON
                             val json = JSONObject(data)
                             json.optString("message", data)
                         }.getOrElse {
-                            // 如果不是JSON，直接使用原始字符串
                             data
                         }
                         trySend(SseEvent.Error(errorMessage))
@@ -170,6 +175,7 @@ class SseClient @Inject constructor(
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                if (!isActive) return
                 Log.e(TAG, "SSE failure: ${t?.message}", t)
                 val errorMessage = t?.message ?: "Connection failed"
                 trySend(SseEvent.Error(errorMessage))
@@ -178,6 +184,7 @@ class SseClient @Inject constructor(
             }
 
             override fun onClosed(eventSource: EventSource) {
+                if (!isActive) return
                 Log.d(TAG, "SSE connection closed")
                 onStateChange?.invoke(SseConnectionState.Closed)
                 close()
@@ -187,15 +194,16 @@ class SseClient @Inject constructor(
         val eventSource = eventSourceFactory.newEventSource(request, listener)
 
         awaitClose {
+            isActive = false
             Log.d(TAG, "Closing SSE connection")
             eventSource.cancel()
             onStateChange?.invoke(SseConnectionState.Closed)
         }
     }.retryWhen { cause, attempt ->
         if (attempt < MAX_RETRY_COUNT && cause !is CancellationException) {
-            Log.w(TAG, "Retrying SSE connection (${attempt + 1}/$MAX_RETRY_COUNT) after ${RETRY_DELAY_MS}ms")
+            Log.w(TAG, "Retrying SSE connection (${attempt + 1}/$MAX_RETRY_COUNT)")
             onStateChange?.invoke(SseConnectionState.Connecting)
-            delay(RETRY_DELAY_MS * (attempt + 1)) // 指数退避
+            delay(RETRY_DELAY_MS * (attempt + 1))
             true
         } else {
             Log.e(TAG, "Max retries reached or cancellation, giving up")

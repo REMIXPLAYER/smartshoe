@@ -48,20 +48,23 @@ fun SelectedRecordDetail(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Start
+                ) {
                     IconButton(
                         onClick = onBackClick,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.leftarrow),
                             contentDescription = "返回",
                             tint = AppColors.Primary,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
 
                     Text(
                         text = "记录详情",
@@ -86,7 +89,7 @@ fun SelectedRecordDetail(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             RecordInfoCard(record = record)
 
@@ -110,7 +113,7 @@ fun SelectedRecordDetail(
             } else ""
 
             if (durationText.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = durationText,
                     fontSize = 11.sp,
@@ -118,17 +121,17 @@ fun SelectedRecordDetail(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             SensorChartItem(data = data, record = record, sensorIndex = 0, sensorName = "传感器 1 - 脚掌前部", color = AppColors.Sensor1)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(modifier = Modifier.fillMaxWidth(), color = AppColors.DividerColor, thickness = 1.dp)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             SensorChartItem(data = data, record = record, sensorIndex = 1, sensorName = "传感器 2 - 脚弓部", color = AppColors.Sensor2)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(modifier = Modifier.fillMaxWidth(), color = AppColors.DividerColor, thickness = 1.dp)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             SensorChartItem(data = data, record = record, sensorIndex = 2, sensorName = "传感器 3 - 脚跟部", color = AppColors.Sensor3)
         }
@@ -145,58 +148,62 @@ private fun RecordInfoCard(record: SensorDataRecord) {
         colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(vertical = 12.dp)) {
             val (displayStartTime, displayEndTime) = if (record.startTime <= record.endTime) {
                 record.startTime to record.endTime
             } else {
                 record.endTime to record.startTime
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "开始时间",
                     fontSize = 11.sp,
-                    color = AppColors.PlaceholderText
+                    color = AppColors.PlaceholderText,
+                    modifier = Modifier.align(Alignment.CenterStart)
                 )
                 Text(
                     text = DateTimeUtils.formatDateTime(displayStartTime),
                     fontSize = 12.sp,
                     color = AppColors.DarkGray,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.align(Alignment.CenterEnd)
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "结束时间",
                     fontSize = 11.sp,
-                    color = AppColors.PlaceholderText
+                    color = AppColors.PlaceholderText,
+                    modifier = Modifier.align(Alignment.CenterStart)
                 )
                 Text(
                     text = DateTimeUtils.formatDateTime(displayEndTime),
                     fontSize = 12.sp,
                     color = AppColors.DarkGray,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.align(Alignment.CenterEnd)
                 )
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
             HorizontalDivider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                color = AppColors.DividerColor
+                modifier = Modifier.fillMaxWidth(),
+                color = AppColors.DividerColor,
+                thickness = 1.dp
             )
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(horizontalAlignment = Alignment.Start) {
                     Text(
                         text = "${record.dataCount}",
                         fontSize = 14.sp,
@@ -210,7 +217,7 @@ private fun RecordInfoCard(record: SensorDataRecord) {
                     )
                 }
 
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "${record.interval}ms",
                         fontSize = 14.sp,
@@ -224,7 +231,7 @@ private fun RecordInfoCard(record: SensorDataRecord) {
                     )
                 }
 
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = "${String.format("%.1f", record.compressionRatio * 100)}%",
                         fontSize = 14.sp,

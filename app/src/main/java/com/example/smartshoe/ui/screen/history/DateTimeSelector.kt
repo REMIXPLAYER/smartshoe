@@ -37,13 +37,17 @@ fun DateTimeSelector(
     onShowDatePicker: ((Date, (Date) -> Unit) -> Unit)? = null
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(16.dp)
         ) {
             Row(
                 modifier = Modifier

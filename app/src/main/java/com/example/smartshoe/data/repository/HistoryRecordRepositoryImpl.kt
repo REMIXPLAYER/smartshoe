@@ -4,11 +4,14 @@ import android.util.Log
 import com.example.smartshoe.config.AppConfig
 import com.example.smartshoe.data.local.LocalDataSource
 import com.example.smartshoe.data.remote.SensorDataApiService
+import com.example.smartshoe.di.ApplicationScope
 import com.example.smartshoe.domain.model.SensorDataPoint
 import com.example.smartshoe.domain.model.SensorDataRecord
 import com.example.smartshoe.domain.repository.AuthRepository
 import com.example.smartshoe.domain.repository.HistoryRecordRepository
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,17 +36,13 @@ import javax.inject.Singleton
 class HistoryRecordRepositoryImpl @Inject constructor(
     private val localDataSource: LocalDataSource,
     private val apiService: SensorDataApiService,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    @ApplicationScope private val applicationScope: CoroutineScope
 ) : HistoryRecordRepository {
 
     companion object {
         private const val TAG = "HistoryRecordRepo"
     }
-
-    // 内部协程作用域，使用 SupervisorJob 确保子协程错误不影响其他协程
-    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    // ========== StateFlow 状态 ==========
 
     private val _recordsFlow = MutableStateFlow<List<SensorDataRecord>>(emptyList())
     override val recordsFlow: StateFlow<List<SensorDataRecord>> = _recordsFlow.asStateFlow()
@@ -161,7 +160,7 @@ class HistoryRecordRepositoryImpl @Inject constructor(
     override fun selectRecord(record: SensorDataRecord?) {
         selectedRecord = record
         if (record != null) {
-            repositoryScope.launch {
+            applicationScope.launch {
                 loadRecordDetail(record.recordId)
             }
         } else {
