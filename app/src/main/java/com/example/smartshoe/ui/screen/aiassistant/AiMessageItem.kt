@@ -57,6 +57,7 @@ fun AiMessageItem(content: String, model: String, generationTimeMs: Long = 0) {
 
 /**
  * 流式AI消息项
+ * 使用节流Markdown渲染以减少流式输出时的CPU开销
  */
 @Composable
 fun StreamingAiMessageItem(content: String, model: String) {
@@ -81,6 +82,7 @@ fun StreamingAiMessageItem(content: String, model: String) {
             Row(verticalAlignment = Alignment.Bottom) {
                 StyledMarkdownText(
                     markdown = content,
+                    isStreaming = true,
                     color = AppColors.DarkGray,
                     style = MaterialTheme.typography.bodyMedium
                 )

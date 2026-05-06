@@ -68,7 +68,7 @@ fun ExpandableDeviceListSection(
                 .fillMaxWidth()
                 .heightIn(
                     min = 60.dp,
-                    max = if (isExpanded) 350.dp else 60.dp
+                    max = if (isExpanded) 520.dp else 60.dp
                 )
         ) {
             // 标题栏 - 统一60.dp高度，解决双行信息挤压问题
@@ -205,7 +205,7 @@ fun ExpandableDeviceListSection(
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 200.dp),
+                                .heightIn(max = 380.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             // 过滤掉已连接的设备，避免重复显示

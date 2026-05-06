@@ -29,6 +29,23 @@ import javax.inject.Inject
 private val INITIAL_SENSOR_COLOR = ColorUtils.COLOR_ZERO
 
 /**
+ * 传感器UI状态数据类
+ * 合并高频更新的传感器状态，减少UI层重组次数
+ * 遵循Clean Architecture：属于Presentation层，封装UI所需的所有传感器状态
+ *
+ * @param colors 传感器颜色列表（用于鞋垫可视化）
+ * @param values 传感器原始数值列表（用于数值显示）
+ * @param statuses 压力状态列表（用于状态描述）
+ * @param historicalData 历史数据列表（用于图表显示）
+ */
+data class SensorUiState(
+    val colors: List<Color> = listOf(INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR),
+    val values: List<Int> = listOf(0, 0, 0),
+    val statuses: List<PressureStatus> = listOf(PressureStatus.NONE, PressureStatus.NONE, PressureStatus.NONE),
+    val historicalData: List<SensorDataPoint> = emptyList()
+)
+
+/**
  * 传感器数据视图模型
  * 管理传感器数据相关的UI状态和逻辑
  *
@@ -38,6 +55,7 @@ private val INITIAL_SENSOR_COLOR = ColorUtils.COLOR_ZERO
  * 3. 添加 BluetoothConnectionManager 依赖，直接收集蓝牙原始数据流
  * 4. 消除 MainActivity 直接访问 Manager 和 LocalDataSource 的问题
  * 5. 消除 MainActivity 作为蓝牙数据中转站的职责
+ * 6. 合并高频传感器状态为单一StateFlow，减少UI重组
  */
 @HiltViewModel
 class SensorDataViewModel @Inject constructor(
@@ -47,6 +65,13 @@ class SensorDataViewModel @Inject constructor(
     private val bluetoothConnectionManager: BluetoothConnectionManager
 ) : ViewModel() {
 
+    // ==================== 合并的传感器UI状态（推荐用于UI层） ====================
+    // 将高频更新的传感器状态合并为单一StateFlow，减少UI层重组次数
+    private val _sensorUiState = MutableStateFlow(SensorUiState())
+    val sensorUiState: StateFlow<SensorUiState> = _sensorUiState.asStateFlow()
+
+    // ==================== 独立的传感器状态（向后兼容） ====================
+    // 以下状态流保持独立，供需要单独观察特定状态的业务逻辑使用
     // 传感器颜色状态 - 基于瞬时数值渐变渲染（使用深灰色作为初始状态）
     private val _sensorColors = MutableStateFlow<List<Color>>(
         listOf(INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR, INITIAL_SENSOR_COLOR)
@@ -147,6 +172,9 @@ class SensorDataViewModel @Inject constructor(
             updateWeightedAverages()
             updatePressureStatuses()
 
+            // 合并更新传感器UI状态（减少UI层重组）
+            updateSensorUiState()
+
             // 检查压力提醒（基于加权平均值）
             if (_pressureAlertsEnabled.value) {
                 checkAndTriggerPressureAlertsFromWeighted()
@@ -174,6 +202,19 @@ class SensorDataViewModel @Inject constructor(
      */
     private fun updatePressureStatuses() {
         _pressureStatuses.value = sensorDataRepository.getPressureStatuses()
+    }
+
+    /**
+     * 更新合并的传感器UI状态
+     * 将高频更新的传感器状态打包为单一对象，减少UI层重组次数
+     */
+    private fun updateSensorUiState() {
+        _sensorUiState.value = SensorUiState(
+            colors = _sensorColors.value,
+            values = _extraValues.value,
+            statuses = _pressureStatuses.value,
+            historicalData = _historicalData.value
+        )
     }
 
     /**
@@ -223,6 +264,8 @@ class SensorDataViewModel @Inject constructor(
         _extraValues.value = listOf(0, 0, 0)
         _weightedAverages.value = listOf(0f, 0f, 0f)
         _pressureStatuses.value = listOf(PressureStatus.NONE, PressureStatus.NONE, PressureStatus.NONE)
+        // 同步重置合并的UI状态
+        _sensorUiState.value = SensorUiState()
     }
 
     /**
@@ -275,6 +318,8 @@ class SensorDataViewModel @Inject constructor(
                 // 加权平均值和压力状态
                 updateWeightedAverages()
                 updatePressureStatuses()
+                // 同步更新合并的UI状态
+                updateSensorUiState()
             }
         }
     }

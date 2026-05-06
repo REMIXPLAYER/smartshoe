@@ -125,14 +125,14 @@ class MainActivity : ComponentActivity() {
         // 设置Compose UI内容
         // 重构：使用 MainScreen 组件，将UI逻辑从Activity分离
         // 使用数据类封装状态和回调，符合Clean Architecture
-        // 优化：使用 combine 合并高频变化的蓝牙/传感器状态，减少重组
+        // 优化：使用 sensorUiState 合并高频传感器状态，减少重组
         setContent {
             // 使用 collectAsStateWithLifecycle 收集各ViewModel状态
             val scannedDevices by bluetoothViewModel.scannedDevices.collectAsStateWithLifecycle()
-            val sensorColors by sensorDataViewModel.sensorColors.collectAsStateWithLifecycle()
-            val extraValues by sensorDataViewModel.extraValues.collectAsStateWithLifecycle()
-            val pressureStatuses by sensorDataViewModel.pressureStatuses.collectAsStateWithLifecycle()
-            val historicalData by sensorDataViewModel.historicalData.collectAsStateWithLifecycle()
+            // 优化：使用合并的 sensorUiState 替代独立的传感器状态，减少UI重组
+            // 独立的 sensorColors/extraValues/pressureStatuses/historicalData 不再单独收集
+            // 它们的数据已通过 sensorUiState 合并传递，避免额外的重组开销
+            val sensorUiState by sensorDataViewModel.sensorUiState.collectAsStateWithLifecycle()
             val connectedDevice by bluetoothViewModel.connectedDevice.collectAsStateWithLifecycle()
             val userWeight by userProfileViewModel.userWeight.collectAsStateWithLifecycle()
             val isScanning by bluetoothViewModel.isScanning.collectAsStateWithLifecycle()
@@ -154,9 +154,10 @@ class MainActivity : ComponentActivity() {
             val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
 
             // 使用 remember 缓存 MainScreenState，避免每次重组都创建新实例
+            // 优化：使用 sensorUiState 作为单一key，减少高频状态变化触发的重组
+            // 注意：不再将独立的传感器状态作为key，避免重复触发
             val state = remember(
-                scannedDevices, sensorColors, extraValues, pressureStatuses,
-                historicalData, connectedDevice, userWeight, isScanning,
+                sensorUiState, scannedDevices, connectedDevice, userWeight, isScanning,
                 isConnecting, connectingDeviceAddress, userState,
                 pressureAlertsEnabled, showAlertDialog, alertMessage,
                 historyRecords, selectedHistoryRecord, recordData,
@@ -165,11 +166,13 @@ class MainActivity : ComponentActivity() {
                 snackbarMessage, snackbarType
             ) {
                 MainScreenState(
+                    sensorUiState = sensorUiState,
+                    // 从合并的 sensorUiState 中提取独立状态，保持向后兼容
+                    sensorColors = sensorUiState.colors,
+                    extraValues = sensorUiState.values,
+                    pressureStatuses = sensorUiState.statuses,
+                    historicalData = sensorUiState.historicalData,
                     scannedDevices = scannedDevices,
-                    sensorColors = sensorColors,
-                    extraValues = extraValues,
-                    pressureStatuses = pressureStatuses,
-                    historicalData = historicalData,
                     connectedDevice = connectedDevice,
                     userWeight = userWeight,
                     isScanning = isScanning,

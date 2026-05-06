@@ -116,9 +116,10 @@ private fun MainAppScreen(
     // 列表类型参数已经是稳定的（data class + immutable list），直接使用
     // 当 state 对象变化但列表内容不变时，Compose 会自动跳过重组
     val stableScannedDevices = state.scannedDevices
-    val stableSensorColors = state.sensorColors
-    val stableExtraValues = state.extraValues
-    val stablePressureStatuses = state.pressureStatuses
+    // 优化：使用合并的 sensorUiState 获取传感器数据，减少重组
+    val stableSensorColors = state.sensorUiState.colors
+    val stableExtraValues = state.sensorUiState.values
+    val stablePressureStatuses = state.sensorUiState.statuses
 
     // AI助手ViewModel和状态
     val aiViewModel = callbacks.aiAssistantViewModel
@@ -181,7 +182,7 @@ private fun MainAppScreen(
                 1 -> { // 数据记录页面
                     DataRecordScreen(
                         modifier = Modifier.padding(innerPadding),
-                        historicalData = state.historicalData,
+                        historicalData = state.sensorUiState.historicalData,
                         connectedDevice = state.connectedDevice,
                         userWeight = state.userWeight,
                     )

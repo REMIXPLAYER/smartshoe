@@ -262,6 +262,8 @@ class AiAssistantViewModel @Inject constructor(
     /**
      * 取消当前SSE请求
      * 修复：使用 Mutex 防止竞态条件，确保消息列表操作的原子性
+     *
+     * 性能优化：使用 ArrayList 预分配容量，减少取消时的内存分配
      */
     fun cancelCurrentRequest() {
         // 1. 取消协程任务
@@ -281,7 +283,9 @@ class AiAssistantViewModel @Inject constructor(
                 if (lastMsg is ChatMessage.StreamingAi) {
                     if (lastMsg.content.isNotEmpty()) {
                         // 将未完成的流式消息转换为普通消息（带取消标记）
-                        val newList = currentMessages.toMutableList().apply {
+                        // 优化：使用 ArrayList 预分配容量，避免 toMutableList 的扩容开销
+                        val newList = ArrayList<ChatMessage>(currentMessages.size).apply {
+                            addAll(currentMessages)
                             removeAt(size - 1)
                             add(ChatMessage.Ai(
                                 content = lastMsg.content + "\n\n[已停止生成]",
@@ -403,13 +407,17 @@ class AiAssistantViewModel @Inject constructor(
      * 更新最后一条消息（用于流式更新）
      * 优化：使用 Mutex 保护，避免竞态条件
      * 注意：流式消息不保存到数据库，只在内存中更新
+     *
+     * 性能优化：使用 ArrayList 预分配容量，减少流式更新时的内存分配
      */
     private suspend fun updateLastMessage(message: ChatMessage) {
         messagesMutex.withLock {
             val currentList = _messages.value
             if (currentList.isNotEmpty()) {
-                val newList = currentList.toMutableList().apply {
-                    this[size - 1] = message
+                // 优化：使用 ArrayList 预分配容量，避免 toMutableList 的扩容开销
+                val newList = ArrayList<ChatMessage>(currentList.size).apply {
+                    addAll(currentList)
+                    set(size - 1, message)
                 }
                 _messages.value = newList
             }
@@ -420,13 +428,17 @@ class AiAssistantViewModel @Inject constructor(
      * 替换最后一条消息（将流式消息替换为最终消息）
      * 优化：使用 Mutex 保护，避免竞态条件
      * 替换后的最终消息会保存到数据库
+     *
+     * 性能优化：使用 ArrayList 预分配容量，减少替换时的内存分配
      */
     private suspend fun replaceLastMessage(message: ChatMessage) {
         var conversationId: String? = null
         messagesMutex.withLock {
             val currentList = _messages.value
             if (currentList.isNotEmpty()) {
-                val newList = currentList.toMutableList().apply {
+                // 优化：使用 ArrayList 预分配容量，避免 toMutableList 的扩容开销
+                val newList = ArrayList<ChatMessage>(currentList.size).apply {
+                    addAll(currentList)
                     removeAt(size - 1)
                     add(message)
                 }
@@ -709,6 +721,8 @@ class AiAssistantViewModel @Inject constructor(
      * 策略：保留第一条欢迎消息，移除最旧的用户/AI消息
      * 使用 Mutex 保护，避免竞态条件
      * 同时保存到数据库（流式消息除外）
+     *
+     * 性能优化：使用 ArrayList 预分配容量，减少添加消息时的内存分配
      */
     private suspend fun addMessage(message: ChatMessage) {
         val currentId = _currentConversationId.value
@@ -719,10 +733,18 @@ class AiAssistantViewModel @Inject constructor(
         var conversationId: String? = null
         messagesMutex.withLock {
             val currentList = _messages.value
+            // 优化：使用 ArrayList 预分配容量，避免列表操作的扩容开销
             val newList = if (currentList.size >= AppConfig.AiAssistant.MAX_MESSAGE_COUNT) {
-                listOf(currentList[0]) + currentList.drop(2).takeLast(AppConfig.AiAssistant.MAX_MESSAGE_COUNT - 2) + message
+                ArrayList<ChatMessage>(AppConfig.AiAssistant.MAX_MESSAGE_COUNT).apply {
+                    add(currentList[0]) // 保留欢迎消息
+                    addAll(currentList.drop(2).takeLast(AppConfig.AiAssistant.MAX_MESSAGE_COUNT - 2))
+                    add(message)
+                }
             } else {
-                currentList + message
+                ArrayList<ChatMessage>(currentList.size + 1).apply {
+                    addAll(currentList)
+                    add(message)
+                }
             }
             _messages.value = newList
             conversationId = _currentConversationId.value
