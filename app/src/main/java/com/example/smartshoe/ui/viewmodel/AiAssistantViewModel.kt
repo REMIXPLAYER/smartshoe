@@ -17,6 +17,7 @@ import com.example.smartshoe.domain.repository.HistoryRecordRepository
 import com.example.smartshoe.domain.usecase.GenerateConversationTitleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
-import java.text.SimpleDateFormat
 import java.util.Collections
 import javax.inject.Inject
 
@@ -49,7 +49,6 @@ class AiAssistantViewModel @Inject constructor(
 ) : ViewModel() {
 
     companion object {
-        private const val KEY_WELCOME_INITIALIZED = "welcome_initialized"
         private const val KEY_CURRENT_CONVERSATION_ID = "current_conversation_id"
     }
 
@@ -63,6 +62,7 @@ class AiAssistantViewModel @Inject constructor(
 
     // AI服务状态
     private val _aiStatus = MutableStateFlow<AiServiceStatus>(AiServiceStatus.Unknown)
+    @Suppress("unused")
     val aiStatus: StateFlow<AiServiceStatus> = _aiStatus.asStateFlow()
 
     // 深度思考模式开关
@@ -79,6 +79,7 @@ class AiAssistantViewModel @Inject constructor(
 
     // SSE连接状态
     private val _connectionState = MutableStateFlow<SseConnectionState>(SseConnectionState.Idle)
+    @Suppress("unused")
     val connectionState: StateFlow<SseConnectionState> = _connectionState.asStateFlow()
 
     // 当前SSE任务，用于取消
@@ -113,6 +114,7 @@ class AiAssistantViewModel @Inject constructor(
 
     // 对话列表加载状态
     private val _isLoadingConversations = MutableStateFlow(false)
+    @Suppress("unused")
     val isLoadingConversations: StateFlow<Boolean> = _isLoadingConversations.asStateFlow()
 
     // 搜索关键词
@@ -241,7 +243,7 @@ class AiAssistantViewModel @Inject constructor(
 
                     if (fullResponse.isNotEmpty()) {
                         replaceLastMessage(ChatMessage.Ai(
-                            content = fullResponse + "\n\n[生成中断: $errorMessage]",
+                            content = "${fullResponse}\n\n[生成中断: $errorMessage]",
                             model = modelName,
                             generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
                         ))
@@ -288,7 +290,7 @@ class AiAssistantViewModel @Inject constructor(
                             addAll(currentMessages)
                             removeAt(size - 1)
                             add(ChatMessage.Ai(
-                                content = lastMsg.content + "\n\n[已停止生成]",
+                                content = "${lastMsg.content}\n\n[已停止生成]",
                                 model = lastMsg.model,
                                 generationTimeMs = 0
                             ))
@@ -500,17 +502,20 @@ class AiAssistantViewModel @Inject constructor(
         viewModelScope.launch {
             val savedId = savedStateHandle.get<String>(KEY_CURRENT_CONVERSATION_ID)
             if (savedId != null) {
-                // 尝试恢复上次对话，并恢复滚动位置
-                val conversation = conversationRepository.getAllConversations().first()
-                    .find { it.id == savedId }
+                val conversationsDeferred = async { conversationRepository.getAllConversations().first() }
+                val messagesDeferred = async { conversationRepository.getMessagesByConversationId(savedId).first() }
+                val conversations = conversationsDeferred.await()
+                val messageList = messagesDeferred.await()
+                val conversation = conversations.find { it.id == savedId }
                 conversation?.let {
                     _lastReadPosition.value = it.lastReadPosition
                 }
-                switchToConversation(savedId)
+                _messages.value = messageList
+                _currentConversationId.value = savedId
+                savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = savedId
                 return@launch
             }
 
-            // 没有保存的ID，检查数据库中是否已有对话
             val existingConversations = conversationRepository.getAllConversations().first()
             if (existingConversations.isNotEmpty()) {
                 val latestConversation = existingConversations.maxByOrNull { it.updatedAt }
@@ -522,7 +527,6 @@ class AiAssistantViewModel @Inject constructor(
                     savedStateHandle[KEY_CURRENT_CONVERSATION_ID] = it.id
                 }
             } else {
-                // 首次使用，创建新对话
                 createNewConversation()
             }
         }
@@ -573,9 +577,11 @@ class AiAssistantViewModel @Inject constructor(
                         _restoredConversationId.value = null
                     }
                 }
-                val conversation = conversationRepository.getAllConversations().first()
-                    .find { it.id == conversationId }
-                val messageList = conversationRepository.getMessagesByConversationId(conversationId).first()
+                val conversationsDeferred = async { conversationRepository.getAllConversations().first() }
+                val messagesDeferred = async { conversationRepository.getMessagesByConversationId(conversationId).first() }
+                val conversations = conversationsDeferred.await()
+                val messageList = messagesDeferred.await()
+                val conversation = conversations.find { it.id == conversationId }
                 _messages.value = messageList
                 conversation?.let {
                     _lastReadPosition.value = it.lastReadPosition
@@ -643,8 +649,7 @@ class AiAssistantViewModel @Inject constructor(
             val title = generateTitleUseCase(content)
             try {
                 conversationRepository.updateConversationTitle(conversationId, title)
-            } catch (e: Exception) {
-                // 静默处理，不影响主流程
+            } catch (_: Exception) {
             }
         }
     }
@@ -652,6 +657,7 @@ class AiAssistantViewModel @Inject constructor(
     /**
      * 获取健康建议
      */
+    @Suppress("unused")
     fun getHealthAdvice(recordId: String, token: String, userAge: Int? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -757,8 +763,8 @@ class AiAssistantViewModel @Inject constructor(
         }
 
         // 延迟更新对话时间，避免每条消息都触发数据库更新和Flow重算
-        _currentConversationId.value?.let { conversationId ->
-            scheduleConversationTimeUpdate(conversationId)
+        _currentConversationId.value?.let { id ->
+            scheduleConversationTimeUpdate(id)
         }
 
         // 在锁外异步更新标题，实现懒加载，不阻塞消息发送流程
@@ -859,6 +865,7 @@ class AiAssistantViewModel @Inject constructor(
      *
      * 优化：使用 withTimeoutOrNull 防止 Flow collect 无限挂起
      */
+    @Suppress("UNUSED_PARAMETER")
     fun loadHistoryRecords(token: String) {
         _isLoadingHistory.value = true
         viewModelScope.launch {
@@ -991,7 +998,7 @@ class AiAssistantViewModel @Inject constructor(
 
                     if (fullResponse.isNotEmpty()) {
                         replaceLastMessage(ChatMessage.Ai(
-                            content = fullResponse + "\n\n[分析中断: $errorMessage]",
+                            content = "${fullResponse}\n\n[分析中断: $errorMessage]",
                             model = modelName,
                             generationTimeMs = AppConfig.AiAssistant.DEFAULT_TIMESTAMP
                         ))

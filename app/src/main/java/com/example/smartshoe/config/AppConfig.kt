@@ -15,6 +15,13 @@ object AppConfig {
         // HC-06蓝牙模块的标准UUID (SPP协议)
         const val SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB"
 
+        // BLE UART 服务UUID（兼容JDY-31/CC2541等BLE串口模块）
+        const val BLE_UART_SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB"
+        // BLE UART 特征UUID（读写）
+        const val BLE_UART_CHAR_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB"
+        // BLE 客户端特征配置描述符UUID（启用通知）
+        const val BLE_CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805F9B34FB"
+
         // 蓝牙数据缓冲区大小 (字节)
         const val BUFFER_SIZE = 1024
 
@@ -53,6 +60,11 @@ object AppConfig {
         // 加权平均配置
         const val WEIGHTED_WINDOW_SIZE = 200         // 滑动窗口大小
         const val WEIGHT_DECAY_FACTOR = 0.9f         // 权重衰减系数
+
+        // 传感器3补偿配置（硬件不可用时，使用传感器2计算）
+        const val SENSOR3_USE_CALCULATED_VALUE = true   // 是否使用计算值替代传感器3
+        const val SENSOR3_MULTIPLIER = 9                // 传感器3 = 传感器2 × MULTIPLIER / DIVISOR
+        const val SENSOR3_DIVISOR = 7
 
         // 颜色渲染阈值
         const val COLOR_THRESHOLD_NORMAL = 0.20f     // 正常压力阈值 (0-20%)
@@ -229,8 +241,8 @@ object AppConfig {
         const val CACHE_ACCESS_ORDER = true
 
         // 流式传输节流配置
-        const val STREAM_MIN_UPDATE_INTERVAL_MS = 50L        // 最小更新间隔（毫秒）
-        const val STREAM_MAX_CHARS_BEFORE_UPDATE = 20         // 最大累积字符数
+        const val STREAM_MIN_UPDATE_INTERVAL_MS = 20L        // 最小更新间隔（毫秒）
+        const val STREAM_MAX_CHARS_BEFORE_UPDATE = 5         // 最大累积字符数
         val STREAM_IMMEDIATE_UPDATE_CHARS = setOf(            // 立即更新触发字符
             '。', '！', '？', '.', '!', '?', '\n', '｜'
         )

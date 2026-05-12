@@ -115,7 +115,7 @@ fun AiAssistantScreen(
         if (messages.isEmpty()) return@LaunchedEffect
 
         if (scrollState.maxValue <= 0) {
-            withTimeoutOrNull(2000L) {
+            withTimeoutOrNull(50L) {
                 snapshotFlow { scrollState.maxValue }.first { it > 0 }
             } ?: run {
                 isScrollRestored = true

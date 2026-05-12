@@ -32,7 +32,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://10.0.2.2:8080/api\""
+                "\"http://115.29.198.85:8080/api\""
                 //http://10.0.2.2:8080/api
             )
         }
@@ -47,7 +47,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://82.156.18.21:8080/api\""
+                "\"http://115.29.198.85:8080/api\""
             )
         }
     }

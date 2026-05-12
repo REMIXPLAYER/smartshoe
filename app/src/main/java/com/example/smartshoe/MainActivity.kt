@@ -276,6 +276,20 @@ class MainActivity : ComponentActivity() {
                 callbacks = callbacks
             )
         }
+
+        // 监听蓝牙连接结果（Activity 层职责：响应事件并更新状态）
+        // 使用 lifecycleScope 而非 LaunchedEffect，符合 Clean Architecture：
+        // - Activity 层负责协程生命周期管理
+        // - ViewModel/Manager 层负责业务逻辑
+        // - Composable 层只消费状态
+        lifecycleScope.launch {
+            bluetoothConnectionManager.connectionResultFlow.collect { (success, _) ->
+                if (success) {
+                    snackbarMessage = "蓝牙设备已连接"
+                    snackbarType = SnackbarType.Success
+                }
+            }
+        }
     }
 
     /**

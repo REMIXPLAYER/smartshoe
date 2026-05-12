@@ -50,20 +50,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.smartshoe.R
-import com.example.smartshoe.ui.component.CompactDeviceListItem
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.viewmodel.SettingViewModel
 import com.example.smartshoe.ui.viewmodel.UploadStatus
-import com.example.smartshoe.util.AnimationDefaults
 
 /**
  * 可展开快捷功能区
  */
 @Composable
 fun QuickActionsSection(
-    scannedDevices: List<BluetoothDevice>,
     connectedDevice: BluetoothDevice?,
-    onConnectDevice: (BluetoothDevice) -> Unit,
     onDisconnectDevice: () -> Unit,
     userWeight: Float,
     onEditWeight: (Float) -> Unit,
@@ -142,9 +138,7 @@ fun QuickActionsSection(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 DeviceSettingsContent(
-                    scannedDevices = scannedDevices,
                     connectedDevice = connectedDevice,
-                    onConnectDevice = onConnectDevice,
                     onDisconnectDevice = onDisconnectDevice
                 )
             }

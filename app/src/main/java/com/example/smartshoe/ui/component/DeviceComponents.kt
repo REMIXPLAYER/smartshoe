@@ -159,8 +159,8 @@ fun CompactDeviceListItem(
     onDisconnect: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val displayName = getDeviceDisplayName(device)
-    val address = device.address ?: "未知地址"
+    val displayName = remember(device) { getDeviceDisplayName(device) }
+    val address = remember(device) { device.address ?: "未知地址" }
     
     // 点击防抖动状态
     var isClickEnabled by remember { mutableStateOf(true) }
@@ -201,7 +201,7 @@ fun CompactDeviceListItem(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                enabled = isClickEnabled && !isConnecting && !isAnyDeviceConnecting,
+                enabled = isClickEnabled && !isAnyDeviceConnecting,
                 onClick = {
                     // 防抖动：禁用点击 500ms
                     isClickEnabled = false
@@ -210,7 +210,7 @@ fun CompactDeviceListItem(
                         isClickEnabled = true
                     }
                     
-                    if (isConnected) {
+                    if (isConnected || isConnecting) {
                         onDisconnect()
                     } else {
                         onConnect()
@@ -230,62 +230,51 @@ fun CompactDeviceListItem(
                 .padding(horizontal = AppDimensions.MediumPadding, vertical = AppDimensions.ContentVerticalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 左侧：连接状态指示器或图标
-            if (useNewStyle && isConnected) {
-                // 新样式：使用 connect_device 图标
-                Icon(
-                    painter = painterResource(R.drawable.connect_device),
-                    contentDescription = "已连接设备",
-                    tint = AppColors.Primary,
-                    modifier = Modifier.size(AppDimensions.IconSizeStandard)
-                )
-            } else {
-                // 旧样式：圆形指示器
-                Box(
-                    modifier = Modifier
-                        .size(AppDimensions.IndicatorSize)
-                        .clip(CircleShape)
-                        .background(
-                            when {
-                                isConnected -> AppColors.Primary
-                                isConnecting -> AppColors.Primary.copy(alpha = pulseAlpha)
-                                else -> Color.Transparent
-                            }
-                        )
-                        .border(
-                            width = AppDimensions.BorderWidth,
-                            color = when {
-                                isConnected -> AppColors.Primary
-                                isConnecting -> AppColors.Primary.copy(alpha = pulseAlpha)
-                                else -> AppColors.OnSurface.copy(alpha = 0.3f)
-                            },
-                            shape = CircleShape
-                        )
-                        .graphicsLayer {
-                            if (isConnecting) {
-                                scaleX = pulseScale
-                                scaleY = pulseScale
-                            }
+            // 左侧：连接状态指示器（实心圆形）
+            Box(
+                modifier = Modifier
+                    .size(AppDimensions.IndicatorSize)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            isConnected -> AppColors.Primary
+                            isConnecting -> AppColors.Primary.copy(alpha = pulseAlpha)
+                            else -> Color.Transparent
+                        }
+                    )
+                    .border(
+                        width = AppDimensions.BorderWidth,
+                        color = when {
+                            isConnected -> AppColors.Primary
+                            isConnecting -> AppColors.Primary.copy(alpha = pulseAlpha)
+                            else -> AppColors.OnSurface.copy(alpha = 0.3f)
                         },
-                    contentAlignment = Alignment.Center
-                ) {
-                    when {
-                        isConnected -> {
-                            Box(
-                                modifier = Modifier
-                                    .size(AppDimensions.SmallPadding)
-                                    .clip(CircleShape)
-                                    .background(AppColors.CardBackground)
-                            )
+                        shape = CircleShape
+                    )
+                    .graphicsLayer {
+                        if (isConnecting) {
+                            scaleX = pulseScale
+                            scaleY = pulseScale
                         }
-                        isConnecting -> {
-                            // 连接中显示旋转的进度指示器
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(10.dp),
-                                color = AppColors.Primary,
-                                strokeWidth = AppDimensions.BorderWidth
-                            )
-                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    isConnected -> {
+                        Box(
+                            modifier = Modifier
+                                .size(AppDimensions.SmallPadding)
+                                .clip(CircleShape)
+                                .background(AppColors.CardBackground)
+                        )
+                    }
+                    isConnecting -> {
+                        // 连接中显示旋转的进度指示器
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(10.dp),
+                            color = AppColors.Primary,
+                            strokeWidth = AppDimensions.BorderWidth
+                        )
                     }
                 }
             }
@@ -347,7 +336,18 @@ fun CompactDeviceListItem(
                     )
                 }
                 isConnecting -> {
-                    // 连接中不显示额外图标，避免视觉混乱
+                    // 连接中显示断开按钮，允许用户取消连接
+                    IconButton(
+                        onClick = onDisconnect,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.disconnect_device),
+                            contentDescription = "取消连接",
+                            tint = AppColors.Error.copy(alpha = 0.7f),
+                            modifier = Modifier.size(AppDimensions.IconSizeStandard)
+                        )
+                    }
                 }
             }
         }

@@ -40,10 +40,8 @@ object SettingScreen {
     @Composable
     fun SettingsScreen(
         modifier: Modifier = Modifier,
-        scannedDevices: List<BluetoothDevice>,
         connectedDevice: BluetoothDevice?,
         userWeight: Float,
-        onConnectDevice: (BluetoothDevice) -> Unit,
         onDisconnectDevice: () -> Unit,
         onClearCache: () -> Unit,
         onEditWeight: (Float) -> Unit,
@@ -123,9 +121,7 @@ object SettingScreen {
             // 快捷功能区
             item {
                 QuickActionsSection(
-                    scannedDevices = scannedDevices,
                     connectedDevice = connectedDevice,
-                    onConnectDevice = onConnectDevice,
                     onDisconnectDevice = onDisconnectDevice,
                     userWeight = userWeight,
                     onEditWeight = onEditWeight,

@@ -102,15 +102,17 @@ fun SelectedRecordDetail(
                 color = AppColors.Primary
             )
 
-            val durationText = if (data.isNotEmpty()) {
-                val durationSeconds = (record.endTime - record.startTime) / 1000
-                val durationStr = when {
-                    durationSeconds < 60 -> "${durationSeconds}秒"
-                    durationSeconds < 3600 -> "${durationSeconds / 60}分${durationSeconds % 60}秒"
-                    else -> "${durationSeconds / 3600}小时${(durationSeconds % 3600) / 60}分"
-                }
-                "数据时长: $durationStr | ${data.size}个数据点"
-            } else ""
+            val durationText = remember(record.recordId, data.size) {
+                if (data.isNotEmpty()) {
+                    val durationSeconds = (record.endTime - record.startTime) / 1000
+                    val durationStr = when {
+                        durationSeconds < 60 -> "${durationSeconds}秒"
+                        durationSeconds < 3600 -> "${durationSeconds / 60}分${durationSeconds % 60}秒"
+                        else -> "${durationSeconds / 3600}小时${(durationSeconds % 3600) / 60}分"
+                    }
+                    "数据时长: $durationStr | ${data.size}个数据点"
+                } else ""
+            }
 
             if (durationText.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -231,9 +233,12 @@ private fun RecordInfoCard(record: SensorDataRecord) {
                     )
                 }
 
+                val compressionText = remember(record.compressionRatio) {
+                    "${String.format("%.1f", record.compressionRatio * 100)}%"
+                }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "${String.format("%.1f", record.compressionRatio * 100)}%",
+                        text = compressionText,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.Primary

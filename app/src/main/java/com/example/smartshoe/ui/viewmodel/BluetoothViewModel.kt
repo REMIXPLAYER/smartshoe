@@ -61,19 +61,15 @@ class BluetoothViewModel @Inject constructor(
 
     /**
      * 停止扫描
-     * 由 Manager 自动管理，此方法保留向后兼容
+     * 委托给 BluetoothConnectionManager
      */
-    @Deprecated(
-        "扫描状态由 BluetoothConnectionManager 自动管理，无需手动调用",
-        ReplaceWith(""),
-        DeprecationLevel.WARNING
-    )
     fun stopScan() {
-        // Manager 会自动处理扫描状态
+        bluetoothConnectionManager.stopScan()
     }
 
     /**
-     * 连接设备
+     * 自动检测并连接设备
+     * 自动识别设备支持的蓝牙协议（BLE GATT 优先，失败后回退 Classic Bluetooth SPP）
      * 委托给 BluetoothConnectionManager
      */
     fun connectDevice(device: BluetoothDevice) {

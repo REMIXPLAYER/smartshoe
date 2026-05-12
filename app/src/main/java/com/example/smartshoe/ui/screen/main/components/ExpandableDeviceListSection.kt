@@ -2,23 +2,26 @@ package com.example.smartshoe.ui.screen.main.components
 
 import android.bluetooth.BluetoothDevice
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,14 +38,7 @@ import com.example.smartshoe.ui.component.CompactDeviceListItem
 import com.example.smartshoe.ui.component.ExpandableChevron
 import com.example.smartshoe.ui.component.RefreshButton
 import com.example.smartshoe.ui.theme.AppColors
-import com.example.smartshoe.util.AnimationDefaults
 
-/**
- * 设备列表区域组件
- * 显示扫描到的蓝牙设备列表，支持滚动查看，包含刷新按钮
- * 展开时悬浮在其他组件上方
- * 样式与 AI模式选择器 保持一致（方案A：现代简洁风）
- */
 @Composable
 fun ExpandableDeviceListSection(
     devices: List<BluetoothDevice>,
@@ -57,6 +53,29 @@ fun ExpandableDeviceListSection(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
+    val displayDevices = remember(devices, connectedDevice) {
+        devices.filter { it.address != connectedDevice?.address }
+    }
+
+    var revealedCount by remember { mutableStateOf(0) }
+    LaunchedEffect(isExpanded) {
+        if (!isExpanded) {
+            revealedCount = 0
+            return@LaunchedEffect
+        }
+        if (revealedCount == 0) {
+            revealedCount = 1
+        }
+        while (true) {
+            kotlinx.coroutines.delay(100)
+            revealedCount++
+        }
+    }
+
+    // 展开内容固定高度，确保 expandVertically 动画目标值恒定
+    // revealedCount 递增只影响内部 LazyColumn 滚动，不改变外层容器高度
+    val FIXED_CONTENT_HEIGHT = 420.dp
+
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
@@ -66,12 +85,8 @@ fun ExpandableDeviceListSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(
-                    min = 60.dp,
-                    max = if (isExpanded) 520.dp else 60.dp
-                )
+                .heightIn(min = 60.dp, max = 520.dp)
         ) {
-            // 标题栏 - 统一60.dp高度，解决双行信息挤压问题
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -89,7 +104,6 @@ fun ExpandableDeviceListSection(
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 蓝牙图标
                     Icon(
                         painter = painterResource(R.drawable.bluetooth),
                         contentDescription = "蓝牙设备",
@@ -99,7 +113,6 @@ fun ExpandableDeviceListSection(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // 主标题 - 统一16.sp SemiBold Primary色
                     Text(
                         text = "蓝牙设备",
                         fontSize = 16.sp,
@@ -108,18 +121,15 @@ fun ExpandableDeviceListSection(
                         modifier = Modifier.weight(1f)
                     )
 
-                    // 右侧区域：连接状态 + 刷新按钮 + 展开图标
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // 连接状态标签（单行显示，避免挤压主标题）
                         if (connectedDevice != null) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(end = 4.dp)
                             ) {
-                                // 状态指示点
                                 Box(
                                     modifier = Modifier
                                         .size(8.dp)
@@ -142,7 +152,6 @@ fun ExpandableDeviceListSection(
                             )
                         }
 
-                        // 刷新按钮 - 使用新的RefreshButton组件
                         RefreshButton(
                             isScanning = isScanning,
                             onRefresh = onScanDevices,
@@ -150,7 +159,6 @@ fun ExpandableDeviceListSection(
                             iconSize = 18.dp
                         )
 
-                        // 统一展开图标（使用ExpandableChevron）
                         ExpandableChevron(
                             isExpanded = isExpanded,
                             size = 24.dp,
@@ -160,41 +168,39 @@ fun ExpandableDeviceListSection(
                 }
             }
 
+            // 展开动画：列表整体滑动展开，设备项淡入出现
+            // 内容固定高度 400dp，expandVertically 目标恒定不抽搐
             AnimatedVisibility(
                 visible = isExpanded,
-                enter = expandVertically(
-                    animationSpec = AnimationDefaults.expandTween
-                ),
-                exit = shrinkVertically(
-                    animationSpec = AnimationDefaults.shrinkTween
-                )
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (devices.isEmpty()) {
-                        // 空状态优化
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "未找到设备",
-                                    fontSize = 14.sp,
-                                    color = AppColors.OnSurface.copy(alpha = 0.5f)
-                                )
-                                Text(
-                                    text = "点击刷新按钮开始扫描",
-                                    fontSize = 12.sp,
-                                    color = AppColors.OnSurface.copy(alpha = 0.4f)
-                                )
-                            }
+                if (displayDevices.isEmpty() && connectedDevice == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "未找到设备",
+                                fontSize = 14.sp,
+                                color = AppColors.OnSurface.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                text = "点击刷新按钮开始扫描",
+                                fontSize = 12.sp,
+                                color = AppColors.OnSurface.copy(alpha = 0.4f)
+                            )
                         }
-                    } else {
-                        // 已连接设备详情头部（展开后显示）
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(FIXED_CONTENT_HEIGHT)
+                    ) {
                         if (connectedDevice != null) {
                             ConnectedDeviceHeader(
                                 device = connectedDevice,
@@ -202,29 +208,30 @@ fun ExpandableDeviceListSection(
                             )
                         }
 
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 380.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            // 过滤掉已连接的设备，避免重复显示
-                            val displayDevices = devices.filter { it.address != connectedDevice?.address }
-                            
-                            items(displayDevices) { device ->
-                                val deviceAddress = device.address
-                                val isThisDeviceConnecting = isConnecting && connectingDeviceAddress == deviceAddress
-                                
-                                CompactDeviceListItem(
-                                    device = device,
-                                    isConnected = false, // 这里都是未连接的设备
-                                    isConnecting = isThisDeviceConnecting,
-                                    isAnyDeviceConnecting = isConnecting,
-                                    onConnect = { onConnectDevice(device) },
-                                    onDisconnect = onDisconnectDevice
-                                )
-                                if (device != displayDevices.last()) {
-                                    HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                        if (displayDevices.isNotEmpty()) {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                itemsIndexed(
+                                    items = displayDevices.take(revealedCount),
+                                    key = { _, device -> device.address ?: device.hashCode().toString() }
+                                ) { _, device ->
+                                    AnimatedVisibility(
+                                        visible = true,
+                                        enter = fadeIn(animationSpec = tween(durationMillis = 500))
+                                    ) {
+                                        CompactDeviceListItem(
+                                            device = device,
+                                            isConnected = false,
+                                            isConnecting = isConnecting && connectingDeviceAddress == device.address,
+                                            isAnyDeviceConnecting = isConnecting,
+                                            onConnect = { onConnectDevice(device) },
+                                            onDisconnect = onDisconnectDevice
+                                        )
+                                    }
                                 }
                             }
                         }

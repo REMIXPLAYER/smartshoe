@@ -1,5 +1,6 @@
 package com.example.smartshoe.ui.screen
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -9,10 +10,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.example.smartshoe.domain.model.SensorDataPoint
 import com.example.smartshoe.domain.model.SensorDataRecord
@@ -83,10 +87,10 @@ fun HistoryScreen(
                 )
 
                 // 详情覆盖层：在卡片区域内从右侧滑入/滑出
-                // 使用 AnimatedVisibility + remember 保存记录值，确保动画期间内容不消失
-                val lastSelectedRecord = remember { mutableStateOf<SensorDataRecord?>(null) }
+                // 使用 remember + var 保存记录值，确保动画期间内容不消失
+                var lastSelectedRecord by remember { mutableStateOf<SensorDataRecord?>(null) }
                 if (selectedRecord != null) {
-                    lastSelectedRecord.value = selectedRecord
+                    lastSelectedRecord = selectedRecord
                 }
 
                 androidx.compose.animation.AnimatedVisibility(
@@ -103,7 +107,7 @@ fun HistoryScreen(
                         .fillMaxSize()
                         .align(Alignment.TopStart)
                 ) {
-                    lastSelectedRecord.value?.let { record ->
+                    lastSelectedRecord?.let { record ->
                         if (isRecordDetailLoading) {
                             Box(
                                 modifier = Modifier

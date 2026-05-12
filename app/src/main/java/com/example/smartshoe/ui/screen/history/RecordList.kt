@@ -1,8 +1,8 @@
 package com.example.smartshoe.ui.screen.history
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Card
@@ -21,6 +21,7 @@ import com.example.smartshoe.util.DateTimeUtils
 
 /**
  * 记录列表
+ * 使用 LazyColumn 替代 Column + verticalScroll，避免一次性创建所有 item
  */
 @Composable
 fun RecordList(
@@ -31,19 +32,20 @@ fun RecordList(
     val itemHeight = 56.dp
     val maxListHeight = itemHeight * 6 + 48.dp
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = maxListHeight)
-            .verticalScroll(rememberScrollState())
+            .heightIn(max = maxListHeight),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
     ) {
-        records.forEach { record ->
+        items(
+            items = records,
+            key = { it.recordId }
+        ) { record ->
             val isSelected = selectedRecord?.recordId == record.recordId
 
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 onClick = { onRecordToggle(record) },
                 colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)

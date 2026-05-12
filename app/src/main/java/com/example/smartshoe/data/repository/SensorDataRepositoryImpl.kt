@@ -89,7 +89,13 @@ class SensorDataRepositoryImpl @Inject constructor() : SensorDataRepository {
 
         val extras = values.toMutableList()
 
-        // 三个传感器统一处理，不再对传感器3做特殊补偿
+        // 传感器3补偿：硬件不可用时，使用传感器2计算值替代
+        if (AppConfig.Sensor.SENSOR3_USE_CALCULATED_VALUE) {
+            val calculatedSensor3 = (extras[1] * AppConfig.Sensor.SENSOR3_MULTIPLIER / AppConfig.Sensor.SENSOR3_DIVISOR)
+                .coerceIn(0, AppConfig.Sensor.SENSOR_MAX_VALUE)
+            extras[2] = calculatedSensor3
+        }
+
         updateSlidingWindowAndCalculate(extras[0], extras[1], extras[2])
 
         // 记录数据到缓冲区

@@ -25,6 +25,7 @@ import com.example.smartshoe.ui.screen.main.SnackbarType
 import com.example.smartshoe.ui.screen.main.components.AppTopBar
 import com.example.smartshoe.ui.screen.main.components.CustomSnackbar
 import com.example.smartshoe.ui.screen.main.components.ExpandableDeviceListSection
+import com.example.smartshoe.ui.screen.main.components.PressureAlertBanner
 import com.example.smartshoe.ui.theme.AppColors
 import com.example.smartshoe.ui.theme.AppDimensions
 import com.example.smartshoe.ui.theme.AppTypography
@@ -72,29 +73,11 @@ fun MainScreen(
                 modifier = Modifier.padding(innerPadding)
             )
         }
-
-        // 显示压力异常消息弹窗
-        if (state.showAlertDialog) {
-            AlertDialog(
-                onDismissRequest = callbacks.onDismissAlert,
-                title = { Text("压力异常警告") },
-                text = { Text(state.alertMessage) },
-                confirmButton = {
-                    TextButton(
-                        onClick = callbacks.onDismissAlert,
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
-                    ) {
-                        Text("确定")
-                    }
-                }
-            )
-        }
     }
 }
 
 /**
  * 应用主题定义
- * 使用MaterialTheme包装内容，确保一致的视觉样式
  */
 @Composable
 private fun SmartShoeAppTheme(content: @Composable () -> Unit) {
@@ -160,90 +143,99 @@ private fun MainAppScreen(
             )
         },
         content = { innerPadding ->
-            // 根据选中的标签显示不同内容
-            when (state.selectedTab) {
-                0 -> { // 主页面
-                    MainContent(
-                        modifier = Modifier.padding(innerPadding),
-                        scannedDevices = stableScannedDevices,
-                        sensorColors = stableSensorColors,
-                        extraValues = stableExtraValues,
-                        pressureStatuses = stablePressureStatuses,
-                        onScanDevices = callbacks.onScanDevices,
-                        onConnectDevice = callbacks.onConnectDevice,
-                        onDisconnectDevice = callbacks.onDisconnectDevice,
-                        connectedDevice = state.connectedDevice,
-                        isScanning = state.isScanning,
-                        isConnecting = state.isConnecting,
-                        connectingDeviceAddress = state.connectingDeviceAddress
-                    )
-                }
-
-                1 -> { // 数据记录页面
-                    DataRecordScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        historicalData = state.sensorUiState.historicalData,
-                        connectedDevice = state.connectedDevice,
-                        userWeight = state.userWeight,
-                    )
-                }
-
-                2 -> { // 历史记录页面
-                    HistoryScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        records = state.historyRecords,
-                        selectedRecord = state.selectedHistoryRecord,
-                        recordData = state.recordData,
-                        isLoading = state.isHistoryLoading,
-                        isRecordDetailLoading = state.isRecordDetailLoading,
-                        startDate = state.historyStartDate,
-                        endDate = state.historyEndDate,
-                        onStartDateChange = callbacks.onStartDateChange,
-                        onEndDateChange = callbacks.onEndDateChange,
-                        onQueryClick = callbacks.onQueryHistory,
-                        onRecordSelect = callbacks.onRecordSelect,
-                        onAiAnalysisClick = callbacks.onAiAnalysisClick,
-                        queryExecuted = state.queryExecuted,
-                        onShowDatePicker = callbacks.onShowDatePicker
-                    )
-                }
-
-                3 -> { // AI助手页面
-                    aiViewModel?.let { viewModel ->
-                        AiAssistantScreen(
+            Box(modifier = Modifier.fillMaxSize()) {
+                // 根据选中的标签显示不同内容
+                when (state.selectedTab) {
+                    0 -> { // 主页面
+                        MainContent(
                             modifier = Modifier.padding(innerPadding),
-                            viewModel = viewModel,
-                            token = callbacks.userToken,
-                            onShowError = callbacks.onShowError ?: {}
+                            scannedDevices = stableScannedDevices,
+                            sensorColors = stableSensorColors,
+                            extraValues = stableExtraValues,
+                            pressureStatuses = stablePressureStatuses,
+                            onScanDevices = callbacks.onScanDevices,
+                            onConnectDevice = callbacks.onConnectDevice,
+                            onDisconnectDevice = callbacks.onDisconnectDevice,
+                            connectedDevice = state.connectedDevice,
+                            isScanning = state.isScanning,
+                            isConnecting = state.isConnecting,
+                            connectingDeviceAddress = state.connectingDeviceAddress
+                        )
+                    }
+
+                    1 -> { // 数据记录页面
+                        DataRecordScreen(
+                            modifier = Modifier.padding(innerPadding),
+                            historicalData = state.sensorUiState.historicalData,
+                            connectedDevice = state.connectedDevice,
+                            userWeight = state.userWeight,
+                        )
+                    }
+
+                    2 -> { // 历史记录页面
+                        HistoryScreen(
+                            modifier = Modifier.padding(innerPadding),
+                            records = state.historyRecords,
+                            selectedRecord = state.selectedHistoryRecord,
+                            recordData = state.recordData,
+                            isLoading = state.isHistoryLoading,
+                            isRecordDetailLoading = state.isRecordDetailLoading,
+                            startDate = state.historyStartDate,
+                            endDate = state.historyEndDate,
+                            onStartDateChange = callbacks.onStartDateChange,
+                            onEndDateChange = callbacks.onEndDateChange,
+                            onQueryClick = callbacks.onQueryHistory,
+                            onRecordSelect = callbacks.onRecordSelect,
+                            onAiAnalysisClick = callbacks.onAiAnalysisClick,
+                            queryExecuted = state.queryExecuted,
+                            onShowDatePicker = callbacks.onShowDatePicker
+                        )
+                    }
+
+                    3 -> { // AI助手页面
+                        aiViewModel?.let { viewModel ->
+                            AiAssistantScreen(
+                                modifier = Modifier.padding(innerPadding),
+                                viewModel = viewModel,
+                                token = callbacks.userToken,
+                                onShowError = callbacks.onShowError ?: {}
+                            )
+                        }
+                    }
+
+                    4 -> { // 设置页面
+                        Log.d("BackupDebug", "MainScreen: 传递 onBackupData=${callbacks.onBackupData}")
+                        SettingsScreen(
+                            modifier = Modifier.padding(innerPadding),
+                            connectedDevice = state.connectedDevice,
+                            userWeight = state.userWeight,
+                            onDisconnectDevice = callbacks.onDisconnectDevice,
+                            onClearCache = callbacks.onClearCache,
+                            onEditWeight = callbacks.onEditWeight,
+                            userState = state.userState,
+                            onLogin = callbacks.onLogin,
+                            onRegister = callbacks.onRegister,
+                            onLogout = callbacks.onLogout,
+                            onEditProfile = callbacks.onEditProfile,
+                            pressureAlertsEnabled = state.pressureAlertsEnabled,
+                            onPressureAlertsChange = callbacks.onPressureAlertsChange,
+                            onBackupData = callbacks.onBackupData,
+                            isLoggedIn = state.isLoggedIn,
+                            hasData = state.hasData,
+                            onGenerateMockData = callbacks.onGenerateMockData,
+                            settingViewModel = callbacks.settingViewModel,
+                            onShowError = callbacks.onShowError,
+                            authUiState = callbacks.authUiState
                         )
                     }
                 }
 
-                4 -> { // 设置页面
-                    Log.d("BackupDebug", "MainScreen: 传递 onBackupData=${callbacks.onBackupData}")
-                    SettingsScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        scannedDevices = stableScannedDevices,
-                        connectedDevice = state.connectedDevice,
-                        userWeight = state.userWeight,
-                        onConnectDevice = callbacks.onConnectDevice,
-                        onDisconnectDevice = callbacks.onDisconnectDevice,
-                        onClearCache = callbacks.onClearCache,
-                        onEditWeight = callbacks.onEditWeight,
-                        userState = state.userState,
-                        onLogin = callbacks.onLogin,
-                        onRegister = callbacks.onRegister,
-                        onLogout = callbacks.onLogout,
-                        onEditProfile = callbacks.onEditProfile,
-                        pressureAlertsEnabled = state.pressureAlertsEnabled,
-                        onPressureAlertsChange = callbacks.onPressureAlertsChange,
-                        onBackupData = callbacks.onBackupData,
-                        isLoggedIn = state.isLoggedIn,
-                        hasData = state.hasData,
-                        onGenerateMockData = callbacks.onGenerateMockData,
-                        settingViewModel = callbacks.settingViewModel,
-                        onShowError = callbacks.onShowError,
-                        authUiState = callbacks.authUiState
+                // 压力异常横幅提醒（非模态，不打断用户操作）
+                if (state.showAlertDialog) {
+                    PressureAlertBanner(
+                        message = state.alertMessage,
+                        onDismiss = callbacks.onDismissAlert,
+                        modifier = Modifier.align(Alignment.TopCenter)
                     )
                 }
             }
